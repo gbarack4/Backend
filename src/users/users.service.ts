@@ -25,12 +25,14 @@ export class UsersService {
           email: data.email,
           role: data.role,
         },
-      });
+      })
+      .returning();
   }
 
   async removeUserByClerkId(clerkUserId: string) {
     return await this.db
       .delete(schema.users)
-      .where(eq(schema.users.clerkUserId, clerkUserId));
+      .where(eq(schema.users.clerkUserId, clerkUserId))
+      .returning();
   }
 }
