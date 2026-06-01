@@ -90,6 +90,16 @@ export class WebhooksController {
 
       return res.status(HttpStatus.OK).json({ success: true });
     } catch (error: unknown) {
+      console.error('RAW DB ERROR:', error);
+
+      const dbError = error as Record<string, any>;
+      if (dbError.code) {
+        this.logger.error(`Postgres Error Code: ${dbError.code}`);
+      }
+      if (dbError.detail) {
+        this.logger.error(`Postgres Error Detail: ${dbError.detail}`);
+      }
+
       if (error instanceof Error) {
         this.logger.error(
           `Webhook processing error: ${error.message}`,
