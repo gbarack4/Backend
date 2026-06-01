@@ -12,10 +12,17 @@ export const DB_CONNECTION = 'DB_CONNECTION' as const;
     {
       provide: DB_CONNECTION,
       useFactory: (configService: ConfigService) => {
-        const connectionString = configService.get<string>('DATABASE_URL');
+        let connectionString = configService.get<string>('DATABASE_URL');
+
+        if (connectionString?.includes('?')) {
+          connectionString = connectionString.split('?')[0];
+        }
 
         const pool = new Pool({
           connectionString,
+          ssl: {
+            rejectUnauthorized: false,
+          },
         });
 
         return drizzle(pool, { schema });
