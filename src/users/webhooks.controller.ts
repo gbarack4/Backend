@@ -18,7 +18,10 @@ interface ClerkUserEvent {
   data: {
     id: string;
     email_addresses?: Array<{ email_address: string }>;
+    first_name?: string;
+    last_name?: string;
     public_metadata?: { role?: string };
+    unsafe_metadata?: { phone_number?: string; address?: string };
   };
 }
 
@@ -70,7 +73,14 @@ export class WebhooksController {
 
     try {
       if (eventType === 'user.created' || eventType === 'user.updated') {
-        const { id, email_addresses, public_metadata } = event.data;
+        const {
+          id,
+          email_addresses,
+          public_metadata,
+          first_name,
+          last_name,
+          unsafe_metadata,
+        } = event.data;
 
         const email = email_addresses?.[0]?.email_address;
 
@@ -82,8 +92,17 @@ export class WebhooksController {
 
         const role = public_metadata?.role || 'student';
 
-        await this.usersService.upsertUser({ clerkUserId: id, email, role });
+        await this.usersService.upsertUser({
+          clerkUserId: id,
+          email,
+          role,
+          firstName: first_name,
+          lastName: last_name,
+          phoneNumber: unsafe_metadata?.phone_number,
+          address: unsafe_metadata?.address,
+        });
       }
+
       if (eventType === 'user.deleted') {
         await this.usersService.removeUserByClerkId(event.data.id);
       }

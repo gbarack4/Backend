@@ -11,19 +11,35 @@ export class UsersService {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  async upsertUser(data: { clerkUserId: string; email: string; role: string }) {
+  async upsertUser(data: {
+    clerkUserId: string;
+    email: string;
+    role: string;
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+    address?: string;
+  }) {
     return await this.db
       .insert(schema.users)
       .values({
         clerkUserId: data.clerkUserId,
         email: data.email,
         role: data.role,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
+        address: data.address,
       })
       .onConflictDoUpdate({
         target: schema.users.clerkUserId,
         set: {
           email: data.email,
           role: data.role,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phoneNumber: data.phoneNumber,
+          address: data.address,
         },
       })
       .returning();
