@@ -58,7 +58,7 @@ export const instructorSchools = pgTable(
       sql`source = ANY (ARRAY['instructor_request'::text, 'school_invite'::text])`,
     ),
   ],
-);
+).enableRLS();
 
 export const locations = pgTable(
   'locations',
@@ -251,7 +251,7 @@ export const instructors = pgTable(
       sql`status = ANY (ARRAY['active'::text, 'inactive'::text])`,
     ),
   ],
-);
+).enableRLS();
 
 export const availability = pgTable(
   'availability',
@@ -287,6 +287,10 @@ export const users = pgTable(
     clerkUserId: text('clerk_user_id').notNull(),
     email: text().notNull(),
     role: text().notNull(),
+    firstName: text('first_name'),
+    lastName: text('last_name'),
+    phoneNumber: text('phone_number'),
+    address: text('address'),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -300,7 +304,7 @@ export const users = pgTable(
       sql`role = ANY (ARRAY['owner'::text, 'admin'::text, 'staff'::text, 'instructor'::text, 'student'::text])`,
     ),
   ],
-);
+).enableRLS();
 
 export const availabilityBlocks = pgTable(
   'availability_blocks',
