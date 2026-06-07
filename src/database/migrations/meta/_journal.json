@@ -15,6 +15,13 @@
       "when": 1780658967652,
       "tag": "0001_add_profile_fields_to_users",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780855945615,
+      "tag": "0002_last_catseye",
+      "breakpoints": true
     }
   ]
 }

@@ -91,17 +91,46 @@ export const schools = pgTable(
   'schools',
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
     name: text().notNull(),
     slug: text().notNull(),
-    domain: text(),
+    status: text().default('active').notNull(),
+    googleReviewsApiKey: text('google_reviews_api_key'),
     timezone: text().default('UTC').notNull(),
+    subscriptionStatus: text('subscription_status')
+      .default('trialing')
+      .notNull(),
+    trialEndsAt: timestamp('trial_ends_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+
     createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+    updatedAt: timestamp('updated_at', {
       withTimezone: true,
       mode: 'string',
     }).defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.ownerUserId],
+      foreignColumns: [users.id],
+      name: 'schools_owner_user_id_fkey',
+    }).onDelete('restrict'),
+
     unique('schools_slug_key').on(table.slug),
+    check(
+      'schools_status_check',
+      sql`status = ANY (ARRAY['onboarding'::text, 'active'::text, 'suspended'::text])`,
+    ),
+    check(
+      'schools_subscription_status_check',
+      sql`subscription_status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'inactive'::text])`,
+    ),
+
     pgPolicy('isolate_schools', {
       as: 'permissive',
       for: 'all',
@@ -709,3 +738,84 @@ export const activityLogs = pgTable(
     }),
   ],
 );
+
+export const schoolDomains = pgTable(
+  'school_domains',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid('school_id').notNull(),
+    domain: text().notNull(),
+    type: text().notNull(),
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    status: text().default('active').notNull(),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    index('idx_school_domains_domain').on(table.domain),
+
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'school_domains_school_id_fkey',
+    }).onDelete('cascade'),
+    check(
+      'school_domains_type_check',
+      sql`type = ANY (ARRAY['subdomain'::text, 'custom'::text])`,
+    ),
+
+    pgPolicy('isolate_school_domains', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+  ],
+).enableRLS();
+
+export const websiteTemplates = pgTable('website_templates', {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  name: text().notNull(),
+  isDefault: boolean('is_default').default(false).notNull(),
+  config: jsonb().default({}).notNull(),
+});
+
+export const schoolWebsites = pgTable(
+  'school_websites',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid('school_id').notNull(),
+    templateId: uuid('template_id').notNull(),
+    status: text().default('active').notNull(),
+    config: jsonb().default({}).notNull(),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    index('idx_school_websites_school_id').on(table.schoolId),
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'school_websites_school_id_fkey',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.templateId],
+      foreignColumns: [websiteTemplates.id],
+      name: 'school_websites_template_id_fkey',
+    }).onDelete('restrict'),
+    pgPolicy('isolate_school_websites', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+  ],
+).enableRLS();
