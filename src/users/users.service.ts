@@ -51,4 +51,14 @@ export class UsersService {
       .where(eq(schema.users.clerkUserId, clerkUserId))
       .returning();
   }
+
+  async findByClerkId(clerkUserId: string) {
+    const [user] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.clerkUserId, clerkUserId))
+      .limit(1);
+
+    return user;
+  }
 }

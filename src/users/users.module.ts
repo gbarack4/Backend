@@ -6,5 +6,6 @@ import { WebhooksController } from './webhooks.controller';
 @Module({
   controllers: [UsersController, WebhooksController],
   providers: [UsersService],
+  exports: [UsersService],
 })
 export class UsersModule {}

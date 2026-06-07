@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { JwtPayload } from '@clerk/types';
 
-interface RequestWithUser extends Request {
+export interface RequestWithUser extends Request {
   user?: JwtPayload;
 }
 
