@@ -21,7 +21,11 @@ interface ClerkUserEvent {
     first_name?: string;
     last_name?: string;
     public_metadata?: { role?: string };
-    unsafe_metadata?: { phone_number?: string; address?: string };
+    unsafe_metadata?: {
+      phone_number?: string;
+      address?: string;
+      role?: string;
+    };
   };
 }
 
@@ -90,7 +94,8 @@ export class WebhooksController {
           );
         }
 
-        const role = public_metadata?.role || 'student';
+        const role =
+          public_metadata?.role || unsafe_metadata?.role || 'student';
 
         await this.usersService.upsertUser({
           clerkUserId: id,

@@ -754,7 +754,7 @@ export const schoolDomains = pgTable(
     }).defaultNow(),
   },
   (table) => [
-    index('idx_school_domains_domain').on(table.domain),
+    unique('school_domains_domain_key').on(table.domain),
 
     foreignKey({
       columns: [table.schoolId],
@@ -775,12 +775,16 @@ export const schoolDomains = pgTable(
   ],
 ).enableRLS();
 
-export const websiteTemplates = pgTable('website_templates', {
-  id: uuid().defaultRandom().primaryKey().notNull(),
-  name: text().notNull(),
-  isDefault: boolean('is_default').default(false).notNull(),
-  config: jsonb().default({}).notNull(),
-});
+export const websiteTemplates = pgTable(
+  'website_templates',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    name: text().notNull(),
+    isDefault: boolean('is_default').default(false).notNull(),
+    config: jsonb().default({}).notNull(),
+  },
+  (table) => [unique('website_templates_name_key').on(table.name)],
+);
 
 export const schoolWebsites = pgTable(
   'school_websites',

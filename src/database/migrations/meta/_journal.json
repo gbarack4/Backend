@@ -22,6 +22,13 @@
       "when": 1780855945615,
       "tag": "0002_last_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780919886845,
+      "tag": "0003_allow_multiple_schools",
+      "breakpoints": true
     }
   ]
 }
