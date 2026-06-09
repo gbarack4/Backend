@@ -95,7 +95,7 @@ export const schools = pgTable(
     name: text().notNull(),
     slug: text().notNull(),
     status: text().default('active').notNull(),
-    googleReviewsApiKey: text('google_reviews_api_key'),
+    googleBusinessUrl: text('google_business_url'),
     timezone: text().default('UTC').notNull(),
     subscriptionStatus: text('subscription_status')
       .default('trialing')

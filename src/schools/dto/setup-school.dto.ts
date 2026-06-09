@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsUrl } from 'class-validator';
 
 export class SetupSchoolDto {
   @IsString()
@@ -10,6 +10,6 @@ export class SetupSchoolDto {
   businessAddress!: string;
 
   @IsOptional()
-  @IsString()
-  googleReviewsApiKey?: string;
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  googleBusinessUrl?: string;
 }

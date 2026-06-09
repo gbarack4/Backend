@@ -1,0 +1,1 @@
+ALTER TABLE "schools" RENAME COLUMN "google_reviews_api_key" TO "google_business_url";

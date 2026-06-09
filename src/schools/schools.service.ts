@@ -71,7 +71,7 @@ export class SchoolsService {
             status: 'active',
             subscriptionStatus: 'trialing',
             trialEndsAt: trialEndsAt.toISOString(),
-            googleReviewsApiKey: dto.googleReviewsApiKey || null,
+            googleBusinessUrl: dto.googleBusinessUrl || null,
           })
           .returning();
 

@@ -29,6 +29,13 @@
       "when": 1780919886845,
       "tag": "0003_allow_multiple_schools",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780999448067,
+      "tag": "0004_rename_google_api_to_url",
+      "breakpoints": true
     }
   ]
 }
