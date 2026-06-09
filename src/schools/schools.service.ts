@@ -6,9 +6,10 @@ import {
   HttpException,
   Inject,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import slugify from 'slugify';
 import * as schema from '../database/schema';
@@ -129,6 +130,62 @@ export class SchoolsService {
         }
       }
       throw new InternalServerErrorException('Failed to set up school');
+    }
+  }
+
+  async getSchoolSettings(userId: string) {
+    try {
+      const records = await this.db
+        .select({
+          school: schema.schools,
+          user: schema.users,
+          location: schema.locations,
+          domain: schema.schoolDomains,
+        })
+        .from(schema.schools)
+        .innerJoin(
+          schema.users,
+          eq(schema.schools.ownerUserId, schema.users.id),
+        )
+        .leftJoin(
+          schema.locations,
+          eq(schema.locations.schoolId, schema.schools.id),
+        )
+        .leftJoin(
+          schema.schoolDomains,
+          and(
+            eq(schema.schoolDomains.schoolId, schema.schools.id),
+            eq(schema.schoolDomains.isPrimary, true),
+          ),
+        )
+        .where(eq(schema.schools.ownerUserId, userId))
+        .limit(1);
+
+      if (!records.length) {
+        throw new NotFoundException('School settings not found for this user');
+      }
+
+      const { school, user, location, domain } = records[0];
+
+      return {
+        name: school.name,
+        email: user.email,
+        phone: user.phoneNumber || '',
+        address: location?.address || '',
+        websiteUrl: domain?.domain || '',
+        googleBusinessUrl: school.googleBusinessUrl || '',
+        timezone: school.timezone,
+        dateFormat: school.dateFormat,
+        timeFormat: school.timeFormat,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Failed to get settings for user ${userId}`, error);
+      throw new InternalServerErrorException(
+        'Could not retrieve school settings',
+      );
     }
   }
 }

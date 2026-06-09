@@ -97,6 +97,8 @@ export const schools = pgTable(
     status: text().default('active').notNull(),
     googleBusinessUrl: text('google_business_url'),
     timezone: text().default('UTC').notNull(),
+    dateFormat: text('date_format').default('DD/MM/YYYY').notNull(),
+    timeFormat: text('time_format').default('24h').notNull(),
     subscriptionStatus: text('subscription_status')
       .default('trialing')
       .notNull(),

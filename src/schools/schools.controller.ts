@@ -1,41 +1,23 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Req,
-  UnauthorizedException,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get } from '@nestjs/common';
 import { SchoolsService } from './schools.service';
 import { SetupSchoolDto } from './dto/setup-school.dto';
-import { UsersService } from '../users/users.service';
-import {
-  ClerkAuthGuard,
-  type RequestWithUser,
-} from '../auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '../auth/guards/require-db-user.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { UserEntity } from '../auth/interfaces/auth.interface';
 
 @Controller('schools')
+@UseGuards(ClerkAuthGuard, RequireDbUserGuard)
 export class SchoolsController {
-  constructor(
-    private readonly schoolsService: SchoolsService,
-    private readonly usersService: UsersService,
-  ) {}
+  constructor(private readonly schoolsService: SchoolsService) {}
 
   @Post('setup')
-  @UseGuards(ClerkAuthGuard)
-  async setup(@Req() req: RequestWithUser, @Body() dto: SetupSchoolDto) {
-    const clerkId = req.user?.sub;
+  async setup(@CurrentUser() user: UserEntity, @Body() dto: SetupSchoolDto) {
+    return this.schoolsService.setupNewSchool(user.id, dto);
+  }
 
-    if (!clerkId) {
-      throw new UnauthorizedException('Invalid user token payload');
-    }
-
-    const dbUser = await this.usersService.findByClerkId(clerkId);
-
-    if (!dbUser) {
-      throw new UnauthorizedException('User record not found in database');
-    }
-
-    return this.schoolsService.setupNewSchool(dbUser.id, dto);
+  @Get('settings')
+  async getSettings(@CurrentUser() user: UserEntity) {
+    return await this.schoolsService.getSchoolSettings(user.id);
   }
 }
