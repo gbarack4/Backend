@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto';
 import slugify from 'slugify';
 import * as schema from '../database/schema';
 import { SetupSchoolDto } from './dto/setup-school.dto';
+import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 
 const DEFAULT_LOCATION_NAME = 'Main Office';
 const APP_DOMAIN_SUFFIX = 'driveinstructor.pro';
@@ -29,7 +30,7 @@ export class SchoolsService {
   ) {}
 
   async setupNewSchool(userId: string, dto: SetupSchoolDto) {
-    const baseSlug = slugify(dto.schoolName, { lower: true, strict: true });
+    const baseSlug = slugify(dto.name, { lower: true, strict: true });
 
     if (!baseSlug) {
       throw new BadRequestException(
@@ -67,7 +68,7 @@ export class SchoolsService {
           .insert(schema.schools)
           .values({
             ownerUserId: userId,
-            name: dto.schoolName,
+            name: dto.name,
             slug,
             status: 'active',
             subscriptionStatus: 'trialing',
@@ -86,7 +87,7 @@ export class SchoolsService {
         await tx.insert(schema.locations).values({
           schoolId: school.id,
           name: DEFAULT_LOCATION_NAME,
-          address: dto.businessAddress,
+          address: dto.address,
         });
 
         await tx.insert(schema.schoolWebsites).values({
@@ -185,6 +186,101 @@ export class SchoolsService {
       this.logger.error(`Failed to get settings for user ${userId}`, error);
       throw new InternalServerErrorException(
         'Could not retrieve school settings',
+      );
+    }
+  }
+
+  async updateSchoolSettings(userId: string, dto: UpdateSchoolSettingsDto) {
+    try {
+      const [school] = await this.db
+        .select({ id: schema.schools.id, slug: schema.schools.slug })
+        .from(schema.schools)
+        .where(eq(schema.schools.ownerUserId, userId))
+        .limit(1);
+
+      if (!school) {
+        throw new NotFoundException('School not found for this user');
+      }
+
+      await this.db.transaction(async (tx) => {
+        const schoolUpdates: Partial<typeof schema.schools.$inferInsert> = {};
+
+        if (dto.name !== undefined) schoolUpdates.name = dto.name;
+        if (dto.googleBusinessUrl !== undefined)
+          schoolUpdates.googleBusinessUrl = dto.googleBusinessUrl;
+        if (dto.timezone !== undefined) schoolUpdates.timezone = dto.timezone;
+        if (dto.dateFormat !== undefined)
+          schoolUpdates.dateFormat = dto.dateFormat;
+        if (dto.timeFormat !== undefined)
+          schoolUpdates.timeFormat = dto.timeFormat;
+
+        let newPrefix: string | undefined;
+        if (dto.websiteUrl !== undefined && dto.websiteUrl !== school.slug) {
+          newPrefix = slugify(dto.websiteUrl, { lower: true, strict: true });
+          schoolUpdates.slug = newPrefix;
+        }
+
+        if (Object.keys(schoolUpdates).length > 0) {
+          await tx
+            .update(schema.schools)
+            .set(schoolUpdates)
+            .where(eq(schema.schools.id, school.id));
+        }
+
+        if (newPrefix) {
+          await tx
+            .update(schema.schoolDomains)
+            .set({ domain: `${newPrefix}.${APP_DOMAIN_SUFFIX}` })
+            .where(
+              and(
+                eq(schema.schoolDomains.schoolId, school.id),
+                eq(schema.schoolDomains.isPrimary, true),
+              ),
+            );
+        }
+
+        if (dto.address !== undefined) {
+          await tx
+            .update(schema.locations)
+            .set({ address: dto.address })
+            .where(eq(schema.locations.schoolId, school.id));
+        }
+
+        if (dto.phone !== undefined) {
+          await tx
+            .update(schema.users)
+            .set({ phoneNumber: dto.phone })
+            .where(eq(schema.users.id, userId));
+        }
+      });
+
+      return { success: true, message: 'Settings updated successfully' };
+    } catch (error: unknown) {
+      const isDbError =
+        typeof error === 'object' && error !== null && 'code' in error;
+      if (isDbError && (error as Record<string, unknown>).code === '23505') {
+        const constraint = (error as Record<string, unknown>)
+          .constraint as string;
+        if (
+          constraint === 'schools_slug_key' ||
+          constraint === 'school_domains_domain_key'
+        ) {
+          throw new ConflictException(
+            'This domain prefix is already taken. Please choose another one.',
+          );
+        }
+      }
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Failed to update settings for user ${userId}`,
+        error instanceof Error ? error.stack : 'Unknown error',
+      );
+      throw new InternalServerErrorException(
+        'Could not update school settings',
       );
     }
   }
