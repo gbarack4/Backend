@@ -30,6 +30,12 @@ export class SchoolsService {
   ) {}
 
   async setupNewSchool(userId: string, dto: SetupSchoolDto) {
+    this.logger.log(`DTO: ${JSON.stringify(dto)}`);
+
+    if (!dto.name) {
+      throw new BadRequestException('School name is required');
+    }
+
     const baseSlug = slugify(dto.name, { lower: true, strict: true });
 
     if (!baseSlug) {
