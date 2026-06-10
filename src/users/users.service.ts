@@ -20,6 +20,29 @@ export class UsersService {
     phoneNumber?: string;
     address?: string;
   }) {
+    const updateSet = {
+      clerkUserId: data.clerkUserId,
+      role: data.role,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phoneNumber: data.phoneNumber,
+      address: data.address,
+    };
+
+    const [existing] = await this.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, data.email))
+      .limit(1);
+
+    if (existing) {
+      return await this.db
+        .update(schema.users)
+        .set(updateSet)
+        .where(eq(schema.users.email, data.email))
+        .returning();
+    }
+
     return await this.db
       .insert(schema.users)
       .values({
@@ -33,14 +56,7 @@ export class UsersService {
       })
       .onConflictDoUpdate({
         target: schema.users.clerkUserId,
-        set: {
-          email: data.email,
-          role: data.role,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phoneNumber: data.phoneNumber,
-          address: data.address,
-        },
+        set: { email: data.email, ...updateSet },
       })
       .returning();
   }
