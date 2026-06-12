@@ -43,6 +43,13 @@
       "when": 1781031658395,
       "tag": "0005_add_date_time_formats_to_schools",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781288125069,
+      "tag": "0006_add_logo_url_to_schools_and_avatar_url_to_users",
+      "breakpoints": true
     }
   ]
 }

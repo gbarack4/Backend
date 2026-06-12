@@ -93,6 +93,7 @@ export const schools = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     ownerUserId: uuid('owner_user_id').notNull(),
     name: text().notNull(),
+    logoUrl: text('logo_url'),
     slug: text().notNull(),
     status: text().default('active').notNull(),
     googleBusinessUrl: text('google_business_url'),
@@ -322,6 +323,7 @@ export const users = pgTable(
     lastName: text('last_name'),
     phoneNumber: text('phone_number'),
     address: text('address'),
+    avatarUrl: text('avatar_url'),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
