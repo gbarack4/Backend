@@ -22,6 +22,7 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type,Authorization,x-school-id',
     credentials: true,
   });
   const port = process.env.PORT || 8000;

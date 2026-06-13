@@ -15,6 +15,7 @@ import slugify from 'slugify';
 import * as schema from '../database/schema';
 import { SetupSchoolDto } from './dto/setup-school.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
+import { S3Service } from '../storage/s3.service';
 
 const DEFAULT_LOCATION_NAME = 'Main Office';
 const APP_DOMAIN_SUFFIX = 'driveinstructor.pro';
@@ -27,6 +28,7 @@ export class SchoolsService {
 
   constructor(
     @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    private readonly s3Service: S3Service,
   ) {}
 
   async setupNewSchool(userId: string, dto: SetupSchoolDto) {
@@ -175,6 +177,7 @@ export class SchoolsService {
       const { school, user, location, domain } = records[0];
 
       return {
+        id: school.id,
         name: school.name,
         email: user.email,
         phone: user.phoneNumber || '',
@@ -184,6 +187,7 @@ export class SchoolsService {
         timezone: school.timezone,
         dateFormat: school.dateFormat,
         timeFormat: school.timeFormat,
+        logoUrl: school.logoUrl || '',
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -199,7 +203,11 @@ export class SchoolsService {
   async updateSchoolSettings(userId: string, dto: UpdateSchoolSettingsDto) {
     try {
       const [school] = await this.db
-        .select({ id: schema.schools.id, slug: schema.schools.slug })
+        .select({
+          id: schema.schools.id,
+          slug: schema.schools.slug,
+          logoUrl: schema.schools.logoUrl,
+        })
         .from(schema.schools)
         .where(eq(schema.schools.ownerUserId, userId))
         .limit(1);
@@ -207,6 +215,8 @@ export class SchoolsService {
       if (!school) {
         throw new NotFoundException('School not found for this user');
       }
+
+      let oldLogoUrlToDelete: string | null = null;
 
       await this.db.transaction(async (tx) => {
         const schoolUpdates: Partial<typeof schema.schools.$inferInsert> = {};
@@ -219,6 +229,13 @@ export class SchoolsService {
           schoolUpdates.dateFormat = dto.dateFormat;
         if (dto.timeFormat !== undefined)
           schoolUpdates.timeFormat = dto.timeFormat;
+
+        if (dto.logoUrl !== undefined) {
+          schoolUpdates.logoUrl = dto.logoUrl;
+          if (school.logoUrl && school.logoUrl !== dto.logoUrl) {
+            oldLogoUrlToDelete = school.logoUrl;
+          }
+        }
 
         let newPrefix: string | undefined;
         if (dto.websiteUrl !== undefined && dto.websiteUrl !== school.slug) {
@@ -259,6 +276,10 @@ export class SchoolsService {
             .where(eq(schema.users.id, userId));
         }
       });
+
+      if (oldLogoUrlToDelete) {
+        await this.s3Service.deleteFile(oldLogoUrlToDelete);
+      }
 
       return { success: true, message: 'Settings updated successfully' };
     } catch (error: unknown) {

@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 import { SchoolsModule } from './schools/schools.module';
 import clerkConfig from './config/clerk.config';
 import { AuthModule } from './auth/auth.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
     UsersModule,
     SchoolsModule,
+    StorageModule,
   ],
   controllers: [],
   providers: [],

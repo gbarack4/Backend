@@ -6,18 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
-import type { JwtPayload } from '@clerk/types';
-import type { Request } from 'express';
-
-interface ClerkJwtPayload extends JwtPayload {
-  public_metadata?: {
-    role?: string;
-  };
-}
-
-interface RequestWithUser extends Request {
-  user?: ClerkJwtPayload;
-}
+import { RequestWithAuth } from '../interfaces/auth.interface';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -33,14 +22,15 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<RequestWithUser>();
-    const user = request.user;
+    const request = context.switchToHttp().getRequest<RequestWithAuth>();
+
+    const user = request.currentUser;
 
     if (!user) {
-      throw new ForbiddenException('User payload not found');
+      throw new ForbiddenException('User profile not found');
     }
 
-    const userRole = user.public_metadata?.role;
+    const userRole = user.role;
 
     if (!userRole || !requiredRoles.includes(userRole)) {
       throw new ForbiddenException(

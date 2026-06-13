@@ -26,6 +26,11 @@ export class UpdateSchoolSettingsDto {
 
   @IsOptional()
   @IsString()
+  @IsUrl()
+  logoUrl?: string;
+
+  @IsOptional()
+  @IsString()
   timezone?: string;
 
   @IsOptional()
