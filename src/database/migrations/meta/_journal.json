@@ -50,6 +50,13 @@
       "when": 1781288125069,
       "tag": "0006_add_logo_url_to_schools_and_avatar_url_to_users",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781462314946,
+      "tag": "0007_add_google_oauth_to_schools",
+      "breakpoints": true
     }
   ]
 }
