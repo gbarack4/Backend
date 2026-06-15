@@ -100,6 +100,8 @@ export const schools = pgTable(
     googleAccessToken: text('google_access_token'),
     googleRefreshToken: text('google_refresh_token'),
     googleAccountId: text('google_account_id'),
+    googleAccountName: text('google_account_name'),
+    googleLocationName: text('google_location_name'),
     timezone: text().default('UTC').notNull(),
     dateFormat: text('date_format').default('DD/MM/YYYY').notNull(),
     timeFormat: text('time_format').default('24h').notNull(),

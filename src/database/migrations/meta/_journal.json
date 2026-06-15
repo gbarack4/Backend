@@ -57,6 +57,13 @@
       "when": 1781462314946,
       "tag": "0007_add_google_oauth_to_schools",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781469061810,
+      "tag": "0008_add-google-business-metadata",
+      "breakpoints": true
     }
   ]
 }

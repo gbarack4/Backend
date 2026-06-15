@@ -16,6 +16,7 @@ import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Role } from '@/auth/enums/role.enum';
 
 @Controller('upload')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
@@ -23,7 +24,7 @@ export class UploadController {
   constructor(private readonly s3Service: S3Service) {}
 
   @Post('school-logo')
-  @Roles('admin', 'owner')
+  @Roles(Role.Owner, Role.Admin)
   @UseInterceptors(FileInterceptor('file'))
   async uploadSchoolLogo(
     @UploadedFile(

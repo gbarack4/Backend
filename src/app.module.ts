@@ -6,6 +6,7 @@ import { SchoolsModule } from './schools/schools.module';
 import clerkConfig from './config/clerk.config';
 import { AuthModule } from './auth/auth.module';
 import { StorageModule } from './storage/storage.module';
+import { GoogleModule } from './google/google.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { StorageModule } from './storage/storage.module';
     UsersModule,
     SchoolsModule,
     StorageModule,
+    GoogleModule,
   ],
   controllers: [],
   providers: [],
