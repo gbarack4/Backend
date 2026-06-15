@@ -8,6 +8,8 @@ import {
   Redirect,
   Post,
   Param,
+  Body,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { inspect } from 'node:util';
@@ -17,6 +19,8 @@ import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
+import { GoogleAuthStatus } from './constants/google.constants';
+import { FRONTEND_ROUTES } from '@/common/constants/frontend-routes.constant';
 
 @Controller('google')
 export class GoogleController {
@@ -28,7 +32,8 @@ export class GoogleController {
     configService: ConfigService,
   ) {
     this.frontendUrl =
-      configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+      configService.get<string>('FRONTEND_URL') ??
+      'https://admin.driveinstructor.pro';
   }
 
   @Get('connect')
@@ -48,38 +53,61 @@ export class GoogleController {
     @Query('state') signedState: string,
     @Query('error') error: string,
   ) {
+    const buildRedirectUrl = (
+      statusKey: 'error' | 'success',
+      statusValue: GoogleAuthStatus,
+    ) =>
+      `${this.frontendUrl}${FRONTEND_ROUTES.INTEGRATIONS}?${statusKey}=${statusValue}`;
+
     if (error) {
-      return {
-        url: `${this.frontendUrl}/integrations?error=google_auth_denied`,
-      };
+      return { url: buildRedirectUrl('error', GoogleAuthStatus.Denied) };
     }
 
     if (!code || !signedState) {
-      return {
-        url: `${this.frontendUrl}/integrations?error=google_auth_failed`,
-      };
+      return { url: buildRedirectUrl('error', GoogleAuthStatus.Failed) };
     }
 
     try {
       await this.googleService.handleCallback(code, signedState);
-      return {
-        url: `${this.frontendUrl}/integrations?success=google_connected`,
-      };
+      return { url: buildRedirectUrl('success', GoogleAuthStatus.Success) };
     } catch (err: unknown) {
       const errorDetails = err instanceof Error ? err.stack : inspect(err);
       this.logger.error('Failed to handle Google OAuth callback', errorDetails);
 
-      return { url: `${this.frontendUrl}/integrations?error=internal_error` };
+      return { url: buildRedirectUrl('error', GoogleAuthStatus.InternalError) };
     }
   }
 
-  @Post(':schoolId/sync')
+  @Get(':schoolId/locations')
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
-  async syncProfile(
+  async getLocations(
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {
-    return this.googleService.syncGoogleBusinessProfile(schoolId);
+    return this.googleService.fetchAvailableLocations(schoolId);
+  }
+
+  @Post(':schoolId/locations')
+  @Roles(Role.Owner, Role.Admin)
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+  async saveLocation(
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
+    @Body('locationName') locationName: string,
+    @Body('accountName') accountName: string,
+  ) {
+    if (!locationName || !accountName) {
+      throw new BadRequestException(
+        'locationName and accountName are required',
+      );
+    }
+
+    await this.googleService.setBusinessLocation(
+      schoolId,
+      locationName,
+      accountName,
+    );
+
+    return { success: true };
   }
 
   @Get(':schoolId/reviews')
