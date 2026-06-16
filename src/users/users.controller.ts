@@ -4,6 +4,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Request } from 'express';
 import type { JwtPayload } from '@clerk/types';
+import { Role } from '@/auth/enums/role.enum';
 
 @UseGuards(ClerkAuthGuard, RolesGuard)
 @Controller('users')
@@ -14,7 +15,7 @@ export class UsersController {
     return { message: 'User profile', id: user.sub };
   }
 
-  @Roles('owner', 'instructor')
+  @Roles(Role.Owner, Role.Instructor)
   @Get()
   getStudents() {
     return {

@@ -14,44 +14,14 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
 import { inspect } from 'node:util';
 import * as schema from '@/database/schema';
-
-const GOOGLE_ENDPOINTS = {
-  ACCOUNTS: 'https://mybusinessaccountmanagement.googleapis.com/v1/accounts',
-  LOCATIONS: (accountName: string) =>
-    `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title`,
-  REVIEWS: (locationName: string) =>
-    `https://mybusiness.googleapis.com/v4/${locationName}/reviews`,
-} as const;
-
-interface GoogleAccount {
-  name: string;
-}
-
-interface GoogleAccountsResponse {
-  accounts?: GoogleAccount[];
-}
-
-interface GoogleLocationsResponse {
-  locations?: Array<{ name: string; title: string }>;
-}
-
-interface GoogleReviewsResponse {
-  reviews?: Array<Record<string, unknown>>;
-}
-
-export interface GoogleLocation {
-  id: string;
-  title: string;
-  accountName: string;
-}
-
-export type SchoolGoogleData = {
-  id: string;
-  accessToken: string | null;
-  refreshToken: string | null;
-  locationName: string | null;
-  googleAccountId: string | null;
-};
+import {
+  GoogleAccountsResponse,
+  GoogleLocation,
+  GoogleLocationsResponse,
+  GoogleReviewsResponse,
+  SchoolGoogleData,
+} from './types/google.types';
+import { GOOGLE_ENDPOINTS } from './constants/google.endpoints';
 
 @Injectable()
 export class GoogleService {
