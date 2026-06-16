@@ -64,6 +64,13 @@
       "when": 1781469061810,
       "tag": "0008_add-google-business-metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781639226757,
+      "tag": "0009_update_schools_and_locations",
+      "breakpoints": true
     }
   ]
 }

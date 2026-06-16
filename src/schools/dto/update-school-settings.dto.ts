@@ -1,43 +1,12 @@
-import { IsString, IsOptional, IsUrl, Matches } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
+import { BaseSchoolDto } from './base-school.dto';
 
-export class UpdateSchoolSettingsDto {
+export class UpdateSchoolSettingsDto extends BaseSchoolDto {
   @IsOptional()
   @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  phone?: string;
+  domainPrefix?: string;
 
   @IsOptional()
   @IsString()
-  address?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^[a-zA-Z0-9-]+$/, {
-    message: 'Prefix can only contain letters, numbers, and hyphens',
-  })
-  websiteUrl?: string;
-
-  @IsOptional()
-  @IsUrl()
-  googleBusinessUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsUrl()
   logoUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  timezone?: string;
-
-  @IsOptional()
-  @IsString()
-  dateFormat?: string;
-
-  @IsOptional()
-  @IsString()
-  timeFormat?: string;
 }

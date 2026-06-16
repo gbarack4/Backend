@@ -67,6 +67,12 @@ export const locations = pgTable(
     schoolId: uuid('school_id').notNull(),
     name: text().notNull(),
     address: text(),
+    addressLine1: text('address_line_1'),
+    addressLine2: text('address_line_2'),
+    suburb: text('suburb'),
+    state: text('state'),
+    postcode: text('postcode'),
+
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -93,6 +99,11 @@ export const schools = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     ownerUserId: uuid('owner_user_id').notNull(),
     name: text().notNull(),
+    email: text('email'),
+    phone: text('phone'),
+    category: text('category'),
+    description: text('description'),
+
     logoUrl: text('logo_url'),
     slug: text().notNull(),
     status: text().default('active').notNull(),

@@ -9,18 +9,25 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq } from 'drizzle-orm';
-import { randomBytes } from 'node:crypto';
+import { and, desc, eq } from 'drizzle-orm';
 import slugify from 'slugify';
 import * as schema from '../database/schema';
 import { SetupSchoolDto } from './dto/setup-school.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { S3Service } from '../storage/s3.service';
+import {
+  DEFAULT_LOCATION_NAME,
+  APP_DOMAIN_SUFFIX,
+  DEFAULT_TEMPLATE_NAME,
+  TRIAL_DURATION_DAYS,
+  MAX_SLUG_ATTEMPTS,
+} from './constants/school.constants';
 
-const DEFAULT_LOCATION_NAME = 'Main Office';
-const APP_DOMAIN_SUFFIX = 'driveinstructor.pro';
-const DEFAULT_TEMPLATE_NAME = 'Default Theme';
-const TRIAL_DURATION_DAYS = 14;
+function isPostgresError(
+  error: unknown,
+): error is { code: string; constraint?: string } {
+  return typeof error === 'object' && error !== null && 'code' in error;
+}
 
 @Injectable()
 export class SchoolsService {
@@ -31,14 +38,8 @@ export class SchoolsService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async setupNewSchool(userId: string, dto: SetupSchoolDto) {
-    this.logger.log(`DTO: ${JSON.stringify(dto)}`);
-
-    if (!dto.name) {
-      throw new BadRequestException('School name is required');
-    }
-
-    const baseSlug = slugify(dto.name, { lower: true, strict: true });
+  private async generateUniqueSlug(name: string): Promise<string> {
+    const baseSlug = slugify(name, { lower: true, strict: true });
 
     if (!baseSlug) {
       throw new BadRequestException(
@@ -46,8 +47,27 @@ export class SchoolsService {
       );
     }
 
-    const uniqueSuffix = randomBytes(4).toString('hex');
-    const slug = `${baseSlug}-${uniqueSuffix}`;
+    for (let counter = 1; counter <= MAX_SLUG_ATTEMPTS; counter++) {
+      const slug = counter === 1 ? baseSlug : `${baseSlug}-${counter - 1}`;
+
+      const [existing] = await this.db
+        .select({ id: schema.schools.id })
+        .from(schema.schools)
+        .where(eq(schema.schools.slug, slug))
+        .limit(1);
+
+      if (!existing) return slug;
+    }
+
+    throw new ConflictException(
+      'Could not generate a unique slug. Please try a different school name.',
+    );
+  }
+
+  async setupNewSchool(userId: string, dto: SetupSchoolDto) {
+    this.logger.log(`Setting up school for user ${userId}`);
+
+    const slug = await this.generateUniqueSlug(dto.name);
 
     try {
       return await this.db.transaction(async (tx) => {
@@ -78,10 +98,16 @@ export class SchoolsService {
             ownerUserId: userId,
             name: dto.name,
             slug,
+            email: dto.email,
+            phone: dto.phone,
+            category: dto.category,
+            description: dto.description,
+            timezone: dto.timezone,
+            dateFormat: dto.dateFormat,
+            timeFormat: dto.timeFormat,
             status: 'active',
             subscriptionStatus: 'trialing',
             trialEndsAt: trialEndsAt.toISOString(),
-            googleBusinessUrl: dto.googleBusinessUrl || null,
           })
           .returning();
 
@@ -95,7 +121,11 @@ export class SchoolsService {
         await tx.insert(schema.locations).values({
           schoolId: school.id,
           name: DEFAULT_LOCATION_NAME,
-          address: dto.address,
+          addressLine1: dto.addressLine1,
+          addressLine2: dto.addressLine2,
+          suburb: dto.suburb,
+          state: dto.state,
+          postcode: dto.postcode,
         });
 
         await tx.insert(schema.schoolWebsites).values({
@@ -116,18 +146,10 @@ export class SchoolsService {
       const errorStack = error instanceof Error ? error.stack : 'Unknown error';
       this.logger.error(`Setup error for user ${userId}:`, errorStack);
 
-      if (error instanceof HttpException) {
-        throw error;
-      }
+      if (error instanceof HttpException) throw error;
 
-      const isDbError =
-        typeof error === 'object' && error !== null && 'code' in error;
-
-      if (isDbError && (error as Record<string, unknown>).code === '23505') {
-        const constraint = (error as Record<string, unknown>)
-          .constraint as string;
-
-        switch (constraint) {
+      if (isPostgresError(error) && error.code === '23505') {
+        switch (error.constraint) {
           case 'schools_slug_key':
             throw new ConflictException(
               'School slug already exists. Please try a different name.',
@@ -138,6 +160,7 @@ export class SchoolsService {
             throw new ConflictException('A data conflict occurred.');
         }
       }
+
       throw new InternalServerErrorException('Failed to set up school');
     }
   }
@@ -147,15 +170,10 @@ export class SchoolsService {
       const records = await this.db
         .select({
           school: schema.schools,
-          user: schema.users,
           location: schema.locations,
           domain: schema.schoolDomains,
         })
         .from(schema.schools)
-        .innerJoin(
-          schema.users,
-          eq(schema.schools.ownerUserId, schema.users.id),
-        )
         .leftJoin(
           schema.locations,
           eq(schema.locations.schoolId, schema.schools.id),
@@ -168,31 +186,40 @@ export class SchoolsService {
           ),
         )
         .where(eq(schema.schools.ownerUserId, userId))
+        .orderBy(desc(schema.schools.createdAt))
         .limit(1);
 
       if (!records.length) {
         throw new NotFoundException('School settings not found for this user');
       }
 
-      const { school, user, location, domain } = records[0];
+      const { school, location, domain } = records[0];
+
+      const domainPrefix = domain?.domain
+        ? domain.domain.replace(`.${APP_DOMAIN_SUFFIX}`, '')
+        : '';
 
       return {
         id: school.id,
         name: school.name,
-        email: user.email,
-        phone: user.phoneNumber || '',
-        address: location?.address || '',
-        websiteUrl: domain?.domain || '',
-        googleBusinessUrl: school.googleBusinessUrl || '',
+        email: school.email || '',
+        phone: school.phone || '',
+        category: school.category || '',
+        description: school.description || '',
+        addressLine1: location?.addressLine1 || '',
+        addressLine2: location?.addressLine2 || '',
+        suburb: location?.suburb || '',
+        state: location?.state || '',
+        postcode: location?.postcode || '',
+        domainPrefix,
         timezone: school.timezone,
         dateFormat: school.dateFormat,
         timeFormat: school.timeFormat,
         logoUrl: school.logoUrl || '',
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
+      if (error instanceof NotFoundException) throw error;
+
       this.logger.error(`Failed to get settings for user ${userId}`, error);
       throw new InternalServerErrorException(
         'Could not retrieve school settings',
@@ -216,81 +243,30 @@ export class SchoolsService {
         throw new NotFoundException('School not found for this user');
       }
 
-      let oldLogoUrlToDelete: string | null = null;
+      const cleanup = { oldLogoUrl: null as string | null };
 
       await this.db.transaction(async (tx) => {
-        const schoolUpdates: Partial<typeof schema.schools.$inferInsert> = {};
-
-        if (dto.name !== undefined) schoolUpdates.name = dto.name;
-        if (dto.googleBusinessUrl !== undefined)
-          schoolUpdates.googleBusinessUrl = dto.googleBusinessUrl;
-        if (dto.timezone !== undefined) schoolUpdates.timezone = dto.timezone;
-        if (dto.dateFormat !== undefined)
-          schoolUpdates.dateFormat = dto.dateFormat;
-        if (dto.timeFormat !== undefined)
-          schoolUpdates.timeFormat = dto.timeFormat;
-
-        if (dto.logoUrl !== undefined) {
-          schoolUpdates.logoUrl = dto.logoUrl;
-          if (school.logoUrl && school.logoUrl !== dto.logoUrl) {
-            oldLogoUrlToDelete = school.logoUrl;
-          }
-        }
-
-        let newPrefix: string | undefined;
-        if (dto.websiteUrl !== undefined && dto.websiteUrl !== school.slug) {
-          newPrefix = slugify(dto.websiteUrl, { lower: true, strict: true });
-          schoolUpdates.slug = newPrefix;
-        }
-
-        if (Object.keys(schoolUpdates).length > 0) {
-          await tx
-            .update(schema.schools)
-            .set(schoolUpdates)
-            .where(eq(schema.schools.id, school.id));
-        }
-
-        if (newPrefix) {
-          await tx
-            .update(schema.schoolDomains)
-            .set({ domain: `${newPrefix}.${APP_DOMAIN_SUFFIX}` })
-            .where(
-              and(
-                eq(schema.schoolDomains.schoolId, school.id),
-                eq(schema.schoolDomains.isPrimary, true),
-              ),
-            );
-        }
-
-        if (dto.address !== undefined) {
-          await tx
-            .update(schema.locations)
-            .set({ address: dto.address })
-            .where(eq(schema.locations.schoolId, school.id));
-        }
-
-        if (dto.phone !== undefined) {
-          await tx
-            .update(schema.users)
-            .set({ phoneNumber: dto.phone })
-            .where(eq(schema.users.id, userId));
-        }
+        await this.applySchoolUpdates(tx, school, dto, cleanup);
+        await this.applyLocationUpdates(tx, school.id, dto);
       });
 
-      if (oldLogoUrlToDelete) {
-        await this.s3Service.deleteFile(oldLogoUrlToDelete);
+      if (cleanup.oldLogoUrl) {
+        try {
+          await this.s3Service.deleteFile(cleanup.oldLogoUrl);
+        } catch (err) {
+          this.logger.warn(
+            `Failed to delete old logo from S3: ${cleanup.oldLogoUrl}`,
+            err,
+          );
+        }
       }
 
       return { success: true, message: 'Settings updated successfully' };
     } catch (error: unknown) {
-      const isDbError =
-        typeof error === 'object' && error !== null && 'code' in error;
-      if (isDbError && (error as Record<string, unknown>).code === '23505') {
-        const constraint = (error as Record<string, unknown>)
-          .constraint as string;
+      if (isPostgresError(error) && error.code === '23505') {
         if (
-          constraint === 'schools_slug_key' ||
-          constraint === 'school_domains_domain_key'
+          error.constraint === 'schools_slug_key' ||
+          error.constraint === 'school_domains_domain_key'
         ) {
           throw new ConflictException(
             'This domain prefix is already taken. Please choose another one.',
@@ -298,9 +274,7 @@ export class SchoolsService {
         }
       }
 
-      if (error instanceof HttpException) {
-        throw error;
-      }
+      if (error instanceof HttpException) throw error;
 
       this.logger.error(
         `Failed to update settings for user ${userId}`,
@@ -309,6 +283,104 @@ export class SchoolsService {
       throw new InternalServerErrorException(
         'Could not update school settings',
       );
+    }
+  }
+
+  private buildSchoolUpdates(
+    dto: UpdateSchoolSettingsDto,
+    currentSlug: string,
+    currentLogoUrl: string | null,
+    cleanup: { oldLogoUrl: string | null },
+  ): {
+    updates: Partial<typeof schema.schools.$inferInsert>;
+    newPrefix: string | undefined;
+  } {
+    const updates: Partial<typeof schema.schools.$inferInsert> = {};
+
+    if (dto.name !== undefined) updates.name = dto.name;
+    if (dto.email !== undefined) updates.email = dto.email;
+    if (dto.phone !== undefined) updates.phone = dto.phone;
+    if (dto.category !== undefined) updates.category = dto.category;
+    if (dto.description !== undefined) updates.description = dto.description;
+    if (dto.timezone !== undefined) updates.timezone = dto.timezone;
+    if (dto.dateFormat !== undefined) updates.dateFormat = dto.dateFormat;
+    if (dto.timeFormat !== undefined) updates.timeFormat = dto.timeFormat;
+
+    if (dto.logoUrl !== undefined) {
+      updates.logoUrl = dto.logoUrl;
+      if (currentLogoUrl && currentLogoUrl !== dto.logoUrl) {
+        cleanup.oldLogoUrl = currentLogoUrl;
+      }
+    }
+
+    let newPrefix: string | undefined;
+    if (dto.domainPrefix !== undefined && dto.domainPrefix !== currentSlug) {
+      newPrefix = slugify(dto.domainPrefix, { lower: true, strict: true });
+      updates.slug = newPrefix;
+    }
+
+    return { updates, newPrefix };
+  }
+
+  private buildLocationUpdates(
+    dto: UpdateSchoolSettingsDto,
+  ): Partial<typeof schema.locations.$inferInsert> {
+    const updates: Partial<typeof schema.locations.$inferInsert> = {};
+
+    if (dto.addressLine1 !== undefined) updates.addressLine1 = dto.addressLine1;
+    if (dto.addressLine2 !== undefined) updates.addressLine2 = dto.addressLine2;
+    if (dto.suburb !== undefined) updates.suburb = dto.suburb;
+    if (dto.state !== undefined) updates.state = dto.state;
+    if (dto.postcode !== undefined) updates.postcode = dto.postcode;
+
+    return updates;
+  }
+
+  private async applySchoolUpdates(
+    tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
+    school: { id: string; slug: string; logoUrl: string | null },
+    dto: UpdateSchoolSettingsDto,
+    cleanup: { oldLogoUrl: string | null },
+  ): Promise<void> {
+    const { updates, newPrefix } = this.buildSchoolUpdates(
+      dto,
+      school.slug,
+      school.logoUrl,
+      cleanup,
+    );
+
+    if (Object.keys(updates).length > 0) {
+      await tx
+        .update(schema.schools)
+        .set(updates)
+        .where(eq(schema.schools.id, school.id));
+    }
+
+    if (newPrefix) {
+      await tx
+        .update(schema.schoolDomains)
+        .set({ domain: `${newPrefix}.${APP_DOMAIN_SUFFIX}` })
+        .where(
+          and(
+            eq(schema.schoolDomains.schoolId, school.id),
+            eq(schema.schoolDomains.isPrimary, true),
+          ),
+        );
+    }
+  }
+
+  private async applyLocationUpdates(
+    tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
+    schoolId: string,
+    dto: UpdateSchoolSettingsDto,
+  ): Promise<void> {
+    const updates = this.buildLocationUpdates(dto);
+
+    if (Object.keys(updates).length > 0) {
+      await tx
+        .update(schema.locations)
+        .set(updates)
+        .where(eq(schema.locations.schoolId, schoolId));
     }
   }
 }
