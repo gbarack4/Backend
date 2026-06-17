@@ -27,3 +27,17 @@ export type SchoolGoogleData = {
   locationName: string | null;
   googleAccountId: string | null;
 };
+
+export interface GoogleGeocodeResponse {
+  status: string;
+  results: {
+    geometry: {
+      location: { lat: number; lng: number };
+    };
+  }[];
+}
+
+export interface GoogleTimezoneResponse {
+  status: string;
+  timeZoneId: string;
+}

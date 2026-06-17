@@ -21,6 +21,8 @@ import { Roles } from '@/auth/decorators/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { GoogleAuthStatus } from './constants/google.constants';
 import { FRONTEND_ROUTES } from '@/common/constants/frontend-routes.constant';
+import { TimezoneService } from './timezone.service';
+import { DetectTimezoneDto } from './dto/detect-timezone.dto';
 
 @Controller('google')
 export class GoogleController {
@@ -29,11 +31,18 @@ export class GoogleController {
 
   constructor(
     private readonly googleService: GoogleService,
+    private readonly timezoneService: TimezoneService,
     configService: ConfigService,
   ) {
     this.frontendUrl =
       configService.get<string>('FRONTEND_URL') ??
       'https://admin.driveinstructor.pro';
+  }
+
+  @Post('timezone')
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  async detectTimezone(@Body() body: DetectTimezoneDto) {
+    return await this.timezoneService.getTimezoneByAddress(body.address);
   }
 
   @Get('connect')
