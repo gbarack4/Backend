@@ -105,7 +105,7 @@ export class SchoolsService {
             timezone: dto.timezone,
             dateFormat: dto.dateFormat,
             timeFormat: dto.timeFormat,
-            status: 'active',
+            status: dto.status,
             subscriptionStatus: 'trialing',
             trialEndsAt: trialEndsAt.toISOString(),
           })

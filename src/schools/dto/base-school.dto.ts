@@ -68,4 +68,10 @@ export class BaseSchoolDto {
   @IsString()
   @IsIn(TIME_FORMAT_OPTIONS, { message: 'Invalid time format' })
   timeFormat!: string;
+
+  @IsString()
+  @IsIn(['onboarding', 'active', 'suspended'], {
+    message: 'Status must be either active or closed',
+  })
+  status!: string;
 }
