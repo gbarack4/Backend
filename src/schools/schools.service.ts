@@ -204,6 +204,7 @@ export class SchoolsService {
         name: school.name,
         email: school.email || '',
         phone: school.phone || '',
+        status: school.status || '',
         category: school.category || '',
         description: school.description || '',
         addressLine1: location?.addressLine1 || '',
@@ -300,6 +301,7 @@ export class SchoolsService {
     if (dto.name !== undefined) updates.name = dto.name;
     if (dto.email !== undefined) updates.email = dto.email;
     if (dto.phone !== undefined) updates.phone = dto.phone;
+    if (dto.status !== undefined) updates.status = dto.status;
     if (dto.category !== undefined) updates.category = dto.category;
     if (dto.description !== undefined) updates.description = dto.description;
     if (dto.timezone !== undefined) updates.timezone = dto.timezone;
