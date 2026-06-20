@@ -6,6 +6,8 @@ import { RequireDbUserGuard } from '../auth/guards/require-db-user.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { UserEntity } from '../auth/interfaces/auth.interface';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
+import { UpdateSchoolLogoDto } from './dto/update-school-logo.dto';
+import { UpdateSchoolCoverImageDto } from './dto/update-school-cover-image.dto';
 
 @Controller('schools')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
@@ -19,7 +21,7 @@ export class SchoolsController {
 
   @Get('settings')
   async getSettings(@CurrentUser() user: UserEntity) {
-    return await this.schoolsService.getSchoolSettings(user.id);
+    return this.schoolsService.getSchoolSettings(user.id);
   }
 
   @Patch('settings')
@@ -27,6 +29,25 @@ export class SchoolsController {
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateSchoolSettingsDto,
   ) {
-    return await this.schoolsService.updateSchoolSettings(user.id, dto);
+    return this.schoolsService.updateSchoolSettings(user.id, dto);
+  }
+
+  @Patch('logo')
+  async updateSchoolLogo(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateSchoolLogoDto,
+  ) {
+    return this.schoolsService.updateSchoolLogo(user.id, dto.logoUrl);
+  }
+
+  @Patch('cover')
+  async updateSchoolCoverImage(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateSchoolCoverImageDto,
+  ) {
+    return this.schoolsService.updateSchoolCoverImage(
+      user.id,
+      dto.coverImageUrl,
+    );
   }
 }

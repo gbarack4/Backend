@@ -217,6 +217,7 @@ export class SchoolsService {
         dateFormat: school.dateFormat,
         timeFormat: school.timeFormat,
         logoUrl: school.logoUrl || '',
+        coverImageUrl: school.coverImageUrl || '',
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
@@ -244,23 +245,10 @@ export class SchoolsService {
         throw new NotFoundException('School not found for this user');
       }
 
-      const cleanup = { oldLogoUrl: null as string | null };
-
       await this.db.transaction(async (tx) => {
-        await this.applySchoolUpdates(tx, school, dto, cleanup);
+        await this.applySchoolUpdates(tx, school, dto);
         await this.applyLocationUpdates(tx, school.id, dto);
       });
-
-      if (cleanup.oldLogoUrl) {
-        try {
-          await this.s3Service.deleteFile(cleanup.oldLogoUrl);
-        } catch (err) {
-          this.logger.warn(
-            `Failed to delete old logo from S3: ${cleanup.oldLogoUrl}`,
-            err,
-          );
-        }
-      }
 
       return { success: true, message: 'Settings updated successfully' };
     } catch (error: unknown) {
@@ -287,11 +275,13 @@ export class SchoolsService {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Transaction helpers
+  // -------------------------------------------------------------------------
+
   private buildSchoolUpdates(
     dto: UpdateSchoolSettingsDto,
     currentSlug: string,
-    currentLogoUrl: string | null,
-    cleanup: { oldLogoUrl: string | null },
   ): {
     updates: Partial<typeof schema.schools.$inferInsert>;
     newPrefix: string | undefined;
@@ -307,13 +297,6 @@ export class SchoolsService {
     if (dto.timezone !== undefined) updates.timezone = dto.timezone;
     if (dto.dateFormat !== undefined) updates.dateFormat = dto.dateFormat;
     if (dto.timeFormat !== undefined) updates.timeFormat = dto.timeFormat;
-
-    if (dto.logoUrl !== undefined) {
-      updates.logoUrl = dto.logoUrl;
-      if (currentLogoUrl && currentLogoUrl !== dto.logoUrl) {
-        cleanup.oldLogoUrl = currentLogoUrl;
-      }
-    }
 
     let newPrefix: string | undefined;
     if (dto.domainPrefix !== undefined && dto.domainPrefix !== currentSlug) {
@@ -342,14 +325,8 @@ export class SchoolsService {
     tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
     school: { id: string; slug: string; logoUrl: string | null },
     dto: UpdateSchoolSettingsDto,
-    cleanup: { oldLogoUrl: string | null },
   ): Promise<void> {
-    const { updates, newPrefix } = this.buildSchoolUpdates(
-      dto,
-      school.slug,
-      school.logoUrl,
-      cleanup,
-    );
+    const { updates, newPrefix } = this.buildSchoolUpdates(dto, school.slug);
 
     if (Object.keys(updates).length > 0) {
       await tx
@@ -383,6 +360,95 @@ export class SchoolsService {
         .update(schema.locations)
         .set(updates)
         .where(eq(schema.locations.schoolId, schoolId));
+    }
+  }
+
+  async updateSchoolLogo(userId: string, newLogoUrl: string) {
+    try {
+      const [school] = await this.db
+        .select({ id: schema.schools.id, logoUrl: schema.schools.logoUrl })
+        .from(schema.schools)
+        .where(eq(schema.schools.ownerUserId, userId))
+        .limit(1);
+
+      if (!school) {
+        throw new NotFoundException('School not found for this user');
+      }
+
+      const oldLogoUrl = school.logoUrl;
+
+      await this.db
+        .update(schema.schools)
+        .set({ logoUrl: newLogoUrl })
+        .where(eq(schema.schools.id, school.id));
+
+      if (oldLogoUrl && oldLogoUrl !== newLogoUrl) {
+        try {
+          await this.s3Service.deleteFile(oldLogoUrl);
+        } catch (err) {
+          this.logger.warn(
+            `Failed to delete old logo from S3: ${oldLogoUrl}`,
+            err,
+          );
+        }
+      }
+
+      return { success: true, logoUrl: newLogoUrl };
+    } catch (error: unknown) {
+      if (error instanceof HttpException) throw error;
+
+      this.logger.error(
+        `Failed to update logo for user ${userId}`,
+        error instanceof Error ? error.stack : 'Unknown error',
+      );
+      throw new InternalServerErrorException('Could not update school logo');
+    }
+  }
+
+  async updateSchoolCoverImage(userId: string, newCoverImageUrl: string) {
+    try {
+      const [school] = await this.db
+        .select({
+          id: schema.schools.id,
+          coverImageUrl: schema.schools.coverImageUrl,
+        })
+        .from(schema.schools)
+        .where(eq(schema.schools.ownerUserId, userId))
+        .limit(1);
+
+      if (!school) {
+        throw new NotFoundException('School not found for this user');
+      }
+
+      const oldCoverImageUrl = school.coverImageUrl;
+
+      await this.db
+        .update(schema.schools)
+        .set({ coverImageUrl: newCoverImageUrl })
+        .where(eq(schema.schools.id, school.id));
+
+      if (oldCoverImageUrl && oldCoverImageUrl !== newCoverImageUrl) {
+        try {
+          await this.s3Service.deleteFile(oldCoverImageUrl);
+        } catch (err) {
+          this.logger.warn(
+            `Failed to delete old cover image from S3: ${oldCoverImageUrl}`,
+            err,
+          );
+        }
+      }
+
+      return { success: true, coverImageUrl: newCoverImageUrl };
+    } catch (error: unknown) {
+      if (error instanceof HttpException) throw error;
+
+      this.logger.error(
+        `Failed to update cover image for user ${userId}`,
+        error instanceof Error ? error.stack : 'Unknown error',
+      );
+      throw new InternalServerErrorException(
+        'Could not update school cover image',
+      );
     }
   }
 }

@@ -71,6 +71,13 @@
       "when": 1781639226757,
       "tag": "0009_update_schools_and_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781874453806,
+      "tag": "0010_add-cover-image-to-schools",
+      "breakpoints": true
     }
   ]
 }

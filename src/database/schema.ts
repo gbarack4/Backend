@@ -103,7 +103,7 @@ export const schools = pgTable(
     phone: text('phone'),
     category: text('category'),
     description: text('description'),
-
+    coverImageUrl: text('cover_image_url'),
     logoUrl: text('logo_url'),
     slug: text().notNull(),
     status: text().default('active').notNull(),

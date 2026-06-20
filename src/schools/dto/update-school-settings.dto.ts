@@ -5,8 +5,4 @@ export class UpdateSchoolSettingsDto extends BaseSchoolDto {
   @IsOptional()
   @IsString()
   domainPrefix?: string;
-
-  @IsOptional()
-  @IsString()
-  logoUrl?: string;
 }

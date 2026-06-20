@@ -1,29 +1,40 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { v4 as uuidv4 } from 'uuid';
 import { GetPresignedUrlDto, UploadType } from './dto/get-presigned-url.dto';
+import {
+  ALLOWED_EXTENSIONS,
+  MAX_PRESIGNED_UPLOAD_BYTES,
+} from './constants/storage.constants';
 
 @Injectable()
 export class S3Service {
   private readonly s3Client: S3Client;
   private readonly logger = new Logger(S3Service.name);
 
-  constructor() {
-    const region = process.env.AWS_REGION;
-    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  private readonly bucketName: string;
+  private readonly region: string;
 
-    if (!region || !accessKeyId || !secretAccessKey) {
-      throw new Error('Missing required AWS S3 environment variables');
-    }
+  constructor(private readonly configService: ConfigService) {
+    this.region = this.configService.getOrThrow<string>('AWS_REGION');
+    this.bucketName =
+      this.configService.getOrThrow<string>('AWS_S3_BUCKET_NAME');
+
+    const accessKeyId =
+      this.configService.getOrThrow<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.getOrThrow<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
 
     this.s3Client = new S3Client({
-      region,
+      region: this.region,
       credentials: {
         accessKeyId,
         secretAccessKey,
@@ -31,24 +42,64 @@ export class S3Service {
     });
   }
 
-  async generatePresignedUrl(schoolId: string, dto: GetPresignedUrlDto) {
-    const fileExtension = dto.fileName.split('.').pop();
-    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+  // ---------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------
 
-    let s3Key = '';
+  private assertSchoolId(schoolId: string, context: string): void {
+    if (!schoolId) {
+      throw new BadRequestException(
+        `School ID is required for ${context} upload`,
+      );
+    }
+  }
 
-    if (dto.type === UploadType.SCHOOL_LOGO) {
-      if (!schoolId)
-        throw new BadRequestException('School ID is required for logo upload');
-      s3Key = `schools/${schoolId}/logo-${uniqueFileName}`;
-    } else if (dto.type === UploadType.USER_AVATAR) {
-      s3Key = `users/avatars/${uniqueFileName}`;
-    } else {
-      throw new BadRequestException('Unsupported upload type');
+  private resolveFileExtension(fileName: string): string {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+
+    if (!extension || !ALLOWED_EXTENSIONS.includes(extension)) {
+      throw new BadRequestException(
+        `Unsupported file extension. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`,
+      );
     }
 
+    return extension;
+  }
+
+  private buildS3Key(
+    schoolId: string,
+    type: UploadType,
+    uniqueFileName: string,
+  ): string {
+    switch (type) {
+      case UploadType.SCHOOL_LOGO:
+        this.assertSchoolId(schoolId, 'logo');
+        return `schools/${schoolId}/logo-${uniqueFileName}`;
+      case UploadType.SCHOOL_COVER:
+        this.assertSchoolId(schoolId, 'cover');
+        return `schools/${schoolId}/cover-${uniqueFileName}`;
+      case UploadType.USER_AVATAR:
+        return `users/avatars/${uniqueFileName}`;
+      default:
+        throw new BadRequestException('Unsupported upload type');
+    }
+  }
+
+  private buildFileUrl(s3Key: string): string {
+    return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
+  }
+
+  // ---------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------
+
+  async generatePresignedUrl(schoolId: string, dto: GetPresignedUrlDto) {
+    const fileExtension = this.resolveFileExtension(dto.fileName);
+    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+    const s3Key = this.buildS3Key(schoolId, dto.type, uniqueFileName);
+
     const command = new PutObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Bucket: this.bucketName,
       Key: s3Key,
       ContentType: dto.contentType,
     });
@@ -60,8 +111,13 @@ export class S3Service {
 
       return {
         presignedUrl,
-        fileUrl: `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`,
+        fileUrl: this.buildFileUrl(s3Key),
         key: s3Key,
+        // Returned for the client to enforce before upload. PutObjectCommand
+        // presigned URLs cannot enforce a server-side size limit on their own.
+        // For a hard guarantee enforced by S3 itself, use
+        // `generatePresignedPost` instead.
+        maxSizeBytes: MAX_PRESIGNED_UPLOAD_BYTES,
       };
     } catch (error) {
       this.logger.error('Error generating presigned URL', error);
@@ -69,21 +125,79 @@ export class S3Service {
     }
   }
 
-  async deleteFile(fileUrl: string) {
-    if (!fileUrl) return;
+  /**
+   * Same purpose as `generatePresignedUrl`, but enforces a hard server-side
+   * file size limit via S3's `content-length-range` policy condition —
+   * S3 itself rejects oversized uploads, instead of relying on the client
+   * to respect `maxSizeBytes`.
+   *
+   * Frontend usage differs from the PUT-based flow: the client must POST
+   * a `multipart/form-data` request to `url`, including every entry from
+   * `fields` as form fields, with the file appended last under the `file` key.
+   *
+   *   const formData = new FormData();
+   *   Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+   *   formData.append('file', file);
+   *   await fetch(url, { method: 'POST', body: formData });
+   */
+
+  async generatePresignedPost(schoolId: string, dto: GetPresignedUrlDto) {
+    const fileExtension = this.resolveFileExtension(dto.fileName);
+    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+    const s3Key = this.buildS3Key(schoolId, dto.type, uniqueFileName);
 
     try {
-      const baseUrl = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/`;
-      const s3Key = fileUrl.replace(baseUrl, '');
+      const { url, fields } = await createPresignedPost(this.s3Client, {
+        Bucket: this.bucketName,
+        Key: s3Key,
+        Conditions: [
+          ['content-length-range', 0, MAX_PRESIGNED_UPLOAD_BYTES],
+          ['eq', '$Content-Type', dto.contentType],
+        ],
+        Fields: {
+          'Content-Type': dto.contentType,
+        },
+        Expires: 300,
+      });
+
+      return {
+        url,
+        fields,
+        fileUrl: this.buildFileUrl(s3Key),
+        key: s3Key,
+        maxSizeBytes: MAX_PRESIGNED_UPLOAD_BYTES,
+      };
+    } catch (error) {
+      this.logger.error('Error generating presigned post', error);
+      throw new BadRequestException('Could not generate upload URL');
+    }
+  }
+
+  /**
+   * Never throws — failures are logged and swallowed, since this is
+   * typically called as best-effort cleanup after a DB transaction commits.
+   */
+
+  async deleteFile(fileUrlOrKey: string): Promise<void> {
+    if (!fileUrlOrKey) return;
+
+    try {
+      const baseUrl = this.buildFileUrl('');
+      const s3Key = fileUrlOrKey.startsWith(baseUrl)
+        ? fileUrlOrKey.replace(baseUrl, '')
+        : fileUrlOrKey;
 
       const command = new DeleteObjectCommand({
-        Bucket: process.env.AWS_S3_BUCKET_NAME,
+        Bucket: this.bucketName,
         Key: s3Key,
       });
 
       await this.s3Client.send(command);
     } catch (error) {
-      this.logger.error(`Failed to delete file from S3: ${fileUrl}`, error);
+      this.logger.error(
+        `Failed to delete file from S3: ${fileUrlOrKey}`,
+        error,
+      );
     }
   }
 
@@ -92,24 +206,12 @@ export class S3Service {
     file: Express.Multer.File,
     type: UploadType,
   ) {
-    const fileExtension = file.originalname.split('.').pop();
+    const fileExtension = this.resolveFileExtension(file.originalname);
     const uniqueFileName = `${uuidv4()}.${fileExtension}`;
-
-    let s3Key = '';
-
-    if (type === UploadType.SCHOOL_LOGO) {
-      if (!schoolId) {
-        throw new BadRequestException('School ID is required for logo upload');
-      }
-      s3Key = `schools/${schoolId}/logo-${uniqueFileName}`;
-    } else if (type === UploadType.USER_AVATAR) {
-      s3Key = `users/avatars/${uniqueFileName}`;
-    } else {
-      throw new BadRequestException('Unsupported upload type');
-    }
+    const s3Key = this.buildS3Key(schoolId, type, uniqueFileName);
 
     const command = new PutObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Bucket: this.bucketName,
       Key: s3Key,
       Body: file.buffer,
       ContentType: file.mimetype,
@@ -119,7 +221,7 @@ export class S3Service {
       await this.s3Client.send(command);
 
       return {
-        fileUrl: `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`,
+        fileUrl: this.buildFileUrl(s3Key),
         key: s3Key,
       };
     } catch (error) {

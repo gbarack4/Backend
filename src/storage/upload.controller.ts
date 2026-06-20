@@ -2,7 +2,6 @@ import {
   Controller,
   Post,
   Headers,
-  BadRequestException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -13,13 +12,20 @@ import { S3Service } from './s3.service';
 import { UploadType } from './dto/get-presigned-url.dto';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import { RolesGuard } from '@/auth/guards/roles.guard';
+import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@/auth/enums/role.enum';
+import { MAX_PRESIGNED_UPLOAD_BYTES } from './constants/storage.constants';
+
+const fileValidationPipe = new ParseFilePipe({
+  validators: [
+    new MaxFileSizeValidator({ maxSize: MAX_PRESIGNED_UPLOAD_BYTES }),
+  ],
+});
 
 @Controller('upload')
-@UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+@UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
 export class UploadController {
   constructor(private readonly s3Service: S3Service) {}
 
@@ -27,22 +33,29 @@ export class UploadController {
   @Roles(Role.Owner, Role.Admin)
   @UseInterceptors(FileInterceptor('file'))
   async uploadSchoolLogo(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 })],
-      }),
-    )
-    file: Express.Multer.File,
+    @UploadedFile(fileValidationPipe) file: Express.Multer.File,
     @Headers('x-school-id') schoolId: string,
   ) {
-    if (!schoolId) {
-      throw new BadRequestException('Header "x-school-id" is required');
-    }
-
-    return await this.s3Service.uploadFileDirectly(
+    // `schoolId` presence, school membership, and the per-school role are
+    // already validated by SchoolRolesGuard before this handler runs.
+    return this.s3Service.uploadFileDirectly(
       schoolId,
       file,
       UploadType.SCHOOL_LOGO,
+    );
+  }
+
+  @Post('school-cover')
+  @Roles(Role.Owner, Role.Admin)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadSchoolCover(
+    @UploadedFile(fileValidationPipe) file: Express.Multer.File,
+    @Headers('x-school-id') schoolId: string,
+  ) {
+    return this.s3Service.uploadFileDirectly(
+      schoolId,
+      file,
+      UploadType.SCHOOL_COVER,
     );
   }
 }
