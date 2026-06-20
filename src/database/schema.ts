@@ -199,6 +199,7 @@ export const schoolUsers = pgTable(
     userId: uuid('user_id').notNull(),
     schoolId: uuid('school_id').notNull(),
     role: text().notNull(),
+    permission: text(),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -232,6 +233,14 @@ export const schoolUsers = pgTable(
     check(
       'school_users_role_check',
       sql`role = ANY (ARRAY['owner'::text, 'admin'::text, 'staff'::text])`,
+    ),
+    check(
+      'school_users_permission_check',
+      sql`permission IS NULL OR permission = ANY (ARRAY['view'::text, 'edit'::text])`,
+    ),
+    check(
+      'school_users_owner_permission_check',
+      sql`(role = 'owner' AND permission IS NULL) OR (role <> 'owner' AND permission IS NOT NULL)`,
     ),
   ],
 );

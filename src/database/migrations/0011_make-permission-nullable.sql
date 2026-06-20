@@ -1,0 +1,3 @@
+ALTER TABLE "school_users" ADD COLUMN "permission" text;--> statement-breakpoint
+ALTER TABLE "school_users" ADD CONSTRAINT "school_users_permission_check" CHECK (permission IS NULL OR permission = ANY (ARRAY['view'::text, 'edit'::text]));--> statement-breakpoint
+ALTER TABLE "school_users" ADD CONSTRAINT "school_users_owner_permission_check" CHECK ((role = 'owner' AND permission IS NULL) OR (role <> 'owner' AND permission IS NOT NULL));
