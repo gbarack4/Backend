@@ -165,7 +165,40 @@ export class SchoolsService {
     }
   }
 
-  async getSchoolSettings(userId: string) {
+  async getDefaultSchool(userId: string) {
+    try {
+      const [record] = await this.db
+        .select({
+          id: schema.schools.id,
+          name: schema.schools.name,
+          slug: schema.schools.slug,
+        })
+        .from(schema.schoolUsers)
+        .innerJoin(
+          schema.schools,
+          eq(schema.schools.id, schema.schoolUsers.schoolId),
+        )
+        .where(eq(schema.schoolUsers.userId, userId))
+        .orderBy(schema.schoolUsers.createdAt)
+        .limit(1);
+
+      if (!record) {
+        return null;
+      }
+
+      return record;
+    } catch (error) {
+      this.logger.error(
+        `Failed to get default school for user ${userId}`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'Could not retrieve default school',
+      );
+    }
+  }
+
+  async getSchoolSettings(schoolId: string) {
     try {
       const records = await this.db
         .select({
@@ -185,12 +218,12 @@ export class SchoolsService {
             eq(schema.schoolDomains.isPrimary, true),
           ),
         )
-        .where(eq(schema.schools.ownerUserId, userId))
+        .where(eq(schema.schools.id, schoolId))
         .orderBy(desc(schema.schools.createdAt))
         .limit(1);
 
       if (!records.length) {
-        throw new NotFoundException('School settings not found for this user');
+        throw new NotFoundException('School settings not found');
       }
 
       const { school, location, domain } = records[0];
@@ -222,14 +255,14 @@ export class SchoolsService {
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
 
-      this.logger.error(`Failed to get settings for user ${userId}`, error);
+      this.logger.error(`Failed to get settings for school ${schoolId}`, error);
       throw new InternalServerErrorException(
         'Could not retrieve school settings',
       );
     }
   }
 
-  async updateSchoolSettings(userId: string, dto: UpdateSchoolSettingsDto) {
+  async updateSchoolSettings(schoolId: string, dto: UpdateSchoolSettingsDto) {
     try {
       const [school] = await this.db
         .select({
@@ -238,11 +271,11 @@ export class SchoolsService {
           logoUrl: schema.schools.logoUrl,
         })
         .from(schema.schools)
-        .where(eq(schema.schools.ownerUserId, userId))
+        .where(eq(schema.schools.id, schoolId))
         .limit(1);
 
       if (!school) {
-        throw new NotFoundException('School not found for this user');
+        throw new NotFoundException('School not found');
       }
 
       await this.db.transaction(async (tx) => {
@@ -266,7 +299,7 @@ export class SchoolsService {
       if (error instanceof HttpException) throw error;
 
       this.logger.error(
-        `Failed to update settings for user ${userId}`,
+        `Failed to update settings for school ${schoolId}`,
         error instanceof Error ? error.stack : 'Unknown error',
       );
       throw new InternalServerErrorException(
@@ -363,16 +396,16 @@ export class SchoolsService {
     }
   }
 
-  async updateSchoolLogo(userId: string, newLogoUrl: string) {
+  async updateSchoolLogo(schoolId: string, newLogoUrl: string) {
     try {
       const [school] = await this.db
         .select({ id: schema.schools.id, logoUrl: schema.schools.logoUrl })
         .from(schema.schools)
-        .where(eq(schema.schools.ownerUserId, userId))
+        .where(eq(schema.schools.id, schoolId))
         .limit(1);
 
       if (!school) {
-        throw new NotFoundException('School not found for this user');
+        throw new NotFoundException('School not found');
       }
 
       const oldLogoUrl = school.logoUrl;
@@ -398,14 +431,14 @@ export class SchoolsService {
       if (error instanceof HttpException) throw error;
 
       this.logger.error(
-        `Failed to update logo for user ${userId}`,
+        `Failed to update logo for school ${schoolId}`,
         error instanceof Error ? error.stack : 'Unknown error',
       );
       throw new InternalServerErrorException('Could not update school logo');
     }
   }
 
-  async updateSchoolCoverImage(userId: string, newCoverImageUrl: string) {
+  async updateSchoolCoverImage(schoolId: string, newCoverImageUrl: string) {
     try {
       const [school] = await this.db
         .select({
@@ -413,11 +446,11 @@ export class SchoolsService {
           coverImageUrl: schema.schools.coverImageUrl,
         })
         .from(schema.schools)
-        .where(eq(schema.schools.ownerUserId, userId))
+        .where(eq(schema.schools.id, schoolId))
         .limit(1);
 
       if (!school) {
-        throw new NotFoundException('School not found for this user');
+        throw new NotFoundException('School not found');
       }
 
       const oldCoverImageUrl = school.coverImageUrl;
@@ -443,7 +476,7 @@ export class SchoolsService {
       if (error instanceof HttpException) throw error;
 
       this.logger.error(
-        `Failed to update cover image for user ${userId}`,
+        `Failed to update cover image for school ${schoolId}`,
         error instanceof Error ? error.stack : 'Unknown error',
       );
       throw new InternalServerErrorException(

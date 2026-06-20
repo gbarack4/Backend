@@ -11,20 +11,9 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../../database/schema';
 import { ROLES_KEY } from '../decorators/roles.decorator';
+import { REQUIRE_PERMISSION_KEY } from '../decorators/require-permission.decorator';
 import { RequestWithAuth } from '../interfaces/auth.interface';
 
-/**
- * Verifies that the authenticated user belongs to the school identified by
- * the `x-school-id` header, AND that their role *within that school*
- * (school_users.role) satisfies the roles required by @Roles(...).
- *
- * This replaces checking `users.role` (a global, account-level role) for
- * any endpoint scoped to a specific school — a user who owns School A must
- * not be treated as an owner of School B just because their global role
- * happens to be 'owner'.
- *
- * Requires `RequireDbUserGuard` to run first so `request.currentUser` is set.
- */
 @Injectable()
 export class SchoolRolesGuard implements CanActivate {
   constructor(
@@ -47,7 +36,10 @@ export class SchoolRolesGuard implements CanActivate {
     }
 
     const [membership] = await this.db
-      .select({ role: schema.schoolUsers.role })
+      .select({
+        role: schema.schoolUsers.role,
+        permission: schema.schoolUsers.permission,
+      })
       .from(schema.schoolUsers)
       .where(
         and(
@@ -66,15 +58,27 @@ export class SchoolRolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // No @Roles() decorator on this route — membership alone is enough.
-    if (!requiredRoles) {
-      return true;
-    }
-
-    if (!requiredRoles.includes(membership.role)) {
+    if (requiredRoles && !requiredRoles.includes(membership.role)) {
       throw new ForbiddenException(
         `Access denied. Required roles in this school: ${requiredRoles.join(', ')}`,
       );
+    }
+
+    const requiredPermission = this.reflector.getAllAndOverride<string>(
+      REQUIRE_PERMISSION_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (requiredPermission) {
+      const hasPermission =
+        membership.role === 'owner' ||
+        membership.permission === requiredPermission;
+
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          `Access denied. This action requires '${requiredPermission}' permission.`,
+        );
+      }
     }
 
     return true;

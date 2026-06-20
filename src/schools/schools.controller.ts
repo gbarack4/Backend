@@ -1,4 +1,13 @@
-import { Controller, Post, Body, UseGuards, Get, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Get,
+  Patch,
+  Headers,
+  NotFoundException,
+} from '@nestjs/common';
 import { SchoolsService } from './schools.service';
 import { SetupSchoolDto } from './dto/setup-school.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
@@ -8,6 +17,8 @@ import type { UserEntity } from '../auth/interfaces/auth.interface';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { UpdateSchoolLogoDto } from './dto/update-school-logo.dto';
 import { UpdateSchoolCoverImageDto } from './dto/update-school-cover-image.dto';
+import { SchoolRolesGuard } from '../auth/guards/school-roles.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 
 @Controller('schools')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
@@ -19,34 +30,52 @@ export class SchoolsController {
     return this.schoolsService.setupNewSchool(user.id, dto);
   }
 
+  @Get('default')
+  async getDefaultSchool(@CurrentUser() user: UserEntity) {
+    const defaultSchool = await this.schoolsService.getDefaultSchool(user.id);
+
+    if (!defaultSchool) {
+      throw new NotFoundException('No schools found for this user');
+    }
+
+    return defaultSchool;
+  }
+
   @Get('settings')
-  async getSettings(@CurrentUser() user: UserEntity) {
-    return this.schoolsService.getSchoolSettings(user.id);
+  @UseGuards(SchoolRolesGuard)
+  async getSettings(@Headers('x-school-id') schoolId: string) {
+    return this.schoolsService.getSchoolSettings(schoolId);
   }
 
   @Patch('settings')
+  @UseGuards(SchoolRolesGuard)
+  @RequirePermission('edit')
   async updateSettings(
-    @CurrentUser() user: UserEntity,
+    @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolSettingsDto,
   ) {
-    return this.schoolsService.updateSchoolSettings(user.id, dto);
+    return this.schoolsService.updateSchoolSettings(schoolId, dto);
   }
 
   @Patch('logo')
+  @UseGuards(SchoolRolesGuard)
+  @RequirePermission('edit')
   async updateSchoolLogo(
-    @CurrentUser() user: UserEntity,
+    @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolLogoDto,
   ) {
-    return this.schoolsService.updateSchoolLogo(user.id, dto.logoUrl);
+    return this.schoolsService.updateSchoolLogo(schoolId, dto.logoUrl);
   }
 
   @Patch('cover')
+  @UseGuards(SchoolRolesGuard)
+  @RequirePermission('edit')
   async updateSchoolCoverImage(
-    @CurrentUser() user: UserEntity,
+    @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolCoverImageDto,
   ) {
     return this.schoolsService.updateSchoolCoverImage(
-      user.id,
+      schoolId,
       dto.coverImageUrl,
     );
   }
