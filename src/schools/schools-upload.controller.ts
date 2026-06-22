@@ -5,27 +5,19 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  ParseFilePipe,
-  MaxFileSizeValidator,
 } from '@nestjs/common';
-import { S3Service } from './s3.service';
-import { UploadType } from './dto/get-presigned-url.dto';
+import { S3Service } from '@/storage/s3.service';
+import { UploadType } from '@/storage/dto/get-presigned-url.dto';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
 import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { MAX_PRESIGNED_UPLOAD_BYTES } from './constants/storage.constants';
-
-const fileValidationPipe = new ParseFilePipe({
-  validators: [
-    new MaxFileSizeValidator({ maxSize: MAX_PRESIGNED_UPLOAD_BYTES }),
-  ],
-});
+import { fileValidationPipe } from '@/storage/constants/storage.constants';
 
 @Controller('upload')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
-export class UploadController {
+export class SchoolsUploadController {
   constructor(private readonly s3Service: S3Service) {}
 
   @Post('school-logo')
@@ -37,7 +29,7 @@ export class UploadController {
   ) {
     // `schoolId` presence, school membership, and the granular edit permission
     // are already validated by SchoolRolesGuard before this handler runs.
-    return this.s3Service.uploadFileDirectly(
+    return this.s3Service.uploadSchoolFile(
       schoolId,
       file,
       UploadType.SCHOOL_LOGO,
@@ -51,7 +43,7 @@ export class UploadController {
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
     @Headers('x-school-id') schoolId: string,
   ) {
-    return this.s3Service.uploadFileDirectly(
+    return this.s3Service.uploadSchoolFile(
       schoolId,
       file,
       UploadType.SCHOOL_COVER,

@@ -43,16 +43,8 @@ export class S3Service {
   }
 
   // ---------------------------------------------------------------------
-  // Helpers
+  // Private helpers
   // ---------------------------------------------------------------------
-
-  private assertSchoolId(schoolId: string, context: string): void {
-    if (!schoolId) {
-      throw new BadRequestException(
-        `School ID is required for ${context} upload`,
-      );
-    }
-  }
 
   private resolveFileExtension(fileName: string): string {
     const extension = fileName.split('.').pop()?.toLowerCase();
@@ -66,17 +58,32 @@ export class S3Service {
     return extension;
   }
 
-  private buildS3Key(
+  private buildUniqueFileName(originalName: string): string {
+    const extension = this.resolveFileExtension(originalName);
+    return `${uuidv4()}.${extension}`;
+  }
+
+  private buildFileUrl(s3Key: string): string {
+    return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
+  }
+
+  private buildSchoolS3KeyForPresigned(
     schoolId: string,
     type: UploadType,
     uniqueFileName: string,
   ): string {
     switch (type) {
       case UploadType.SCHOOL_LOGO:
-        this.assertSchoolId(schoolId, 'logo');
+        if (!schoolId)
+          throw new BadRequestException(
+            'School ID is required for logo upload',
+          );
         return `schools/${schoolId}/logo-${uniqueFileName}`;
       case UploadType.SCHOOL_COVER:
-        this.assertSchoolId(schoolId, 'cover');
+        if (!schoolId)
+          throw new BadRequestException(
+            'School ID is required for cover upload',
+          );
         return `schools/${schoolId}/cover-${uniqueFileName}`;
       case UploadType.USER_AVATAR:
         return `users/avatars/${uniqueFileName}`;
@@ -85,8 +92,25 @@ export class S3Service {
     }
   }
 
-  private buildFileUrl(s3Key: string): string {
-    return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
+  private async executeUpload(s3Key: string, file: Express.Multer.File) {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: s3Key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    });
+
+    try {
+      await this.s3Client.send(command);
+
+      return {
+        fileUrl: this.buildFileUrl(s3Key),
+        key: s3Key,
+      };
+    } catch (error) {
+      this.logger.error(`Error uploading file to S3 (key: ${s3Key})`, error);
+      throw new BadRequestException('Could not upload file');
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -94,9 +118,12 @@ export class S3Service {
   // ---------------------------------------------------------------------
 
   async generatePresignedUrl(schoolId: string, dto: GetPresignedUrlDto) {
-    const fileExtension = this.resolveFileExtension(dto.fileName);
-    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
-    const s3Key = this.buildS3Key(schoolId, dto.type, uniqueFileName);
+    const uniqueFileName = this.buildUniqueFileName(dto.fileName);
+    const s3Key = this.buildSchoolS3KeyForPresigned(
+      schoolId,
+      dto.type,
+      uniqueFileName,
+    );
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -140,11 +167,13 @@ export class S3Service {
    *   formData.append('file', file);
    *   await fetch(url, { method: 'POST', body: formData });
    */
-
   async generatePresignedPost(schoolId: string, dto: GetPresignedUrlDto) {
-    const fileExtension = this.resolveFileExtension(dto.fileName);
-    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
-    const s3Key = this.buildS3Key(schoolId, dto.type, uniqueFileName);
+    const uniqueFileName = this.buildUniqueFileName(dto.fileName);
+    const s3Key = this.buildSchoolS3KeyForPresigned(
+      schoolId,
+      dto.type,
+      uniqueFileName,
+    );
 
     try {
       const { url, fields } = await createPresignedPost(this.s3Client, {
@@ -174,10 +203,40 @@ export class S3Service {
   }
 
   /**
+   * Uploads a school-scoped file (logo or cover image).
+   * schoolId is required and validated before upload.
+   */
+  async uploadSchoolFile(
+    schoolId: string,
+    file: Express.Multer.File,
+    type: UploadType.SCHOOL_LOGO | UploadType.SCHOOL_COVER,
+  ) {
+    if (!schoolId) {
+      throw new BadRequestException('School ID is required for school uploads');
+    }
+
+    const uniqueFileName = this.buildUniqueFileName(file.originalname);
+    const prefix = type === UploadType.SCHOOL_LOGO ? 'logo' : 'cover';
+    const s3Key = `schools/${schoolId}/${prefix}-${uniqueFileName}`;
+
+    return this.executeUpload(s3Key, file);
+  }
+
+  /**
+   * Uploads a user avatar. No schoolId needed.
+   */
+  async uploadUserAvatar(file: Express.Multer.File) {
+    const uniqueFileName = this.buildUniqueFileName(file.originalname);
+    const s3Key = `users/avatars/${uniqueFileName}`;
+
+    return this.executeUpload(s3Key, file);
+  }
+
+  /**
+   * Deletes a file from S3 given its full public URL or raw S3 key.
    * Never throws — failures are logged and swallowed, since this is
    * typically called as best-effort cleanup after a DB transaction commits.
    */
-
   async deleteFile(fileUrlOrKey: string): Promise<void> {
     if (!fileUrlOrKey) return;
 
@@ -198,35 +257,6 @@ export class S3Service {
         `Failed to delete file from S3: ${fileUrlOrKey}`,
         error,
       );
-    }
-  }
-
-  async uploadFileDirectly(
-    schoolId: string,
-    file: Express.Multer.File,
-    type: UploadType,
-  ) {
-    const fileExtension = this.resolveFileExtension(file.originalname);
-    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
-    const s3Key = this.buildS3Key(schoolId, type, uniqueFileName);
-
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: s3Key,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-    });
-
-    try {
-      await this.s3Client.send(command);
-
-      return {
-        fileUrl: this.buildFileUrl(s3Key),
-        key: s3Key,
-      };
-    } catch (error) {
-      this.logger.error('Error uploading file directly to S3', error);
-      throw new BadRequestException('Could not upload file');
     }
   }
 }

@@ -1,26 +1,46 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import type { Request } from 'express';
-import type { JwtPayload } from '@clerk/types';
-import { Role } from '@/auth/enums/role.enum';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Post,
+  UseInterceptors,
+  UploadedFile,
+  Patch,
+  Body,
+} from '@nestjs/common';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CurrentUser } from '@/auth/decorators/current-user.decorator';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import type { UserEntity } from '@/auth/interfaces/auth.interface';
+import { fileValidationPipe } from '@/storage/constants/storage.constants';
+import { UsersService } from './users.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
-@UseGuards(ClerkAuthGuard, RolesGuard)
+@UseGuards(ClerkAuthGuard, RequireDbUserGuard)
 @Controller('users')
 export class UsersController {
-  @Get('me')
-  getProfile(@Req() req: Request) {
-    const user = req['user'] as JwtPayload;
-    return { message: 'User profile', id: user.sub };
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get('profile')
+  async getProfile(@CurrentUser() user: UserEntity) {
+    return this.usersService.getProfile(user.id);
   }
 
-  @Roles(Role.Owner, Role.Instructor)
-  @Get()
-  getStudents() {
-    return {
-      message:
-        'The student list is only accessible to the owner or instructor.',
-    };
+  @Patch('profile')
+  async updateProfile(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(user.id, dto);
+  }
+
+  @Post('avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadUserAvatar(
+    @UploadedFile(fileValidationPipe) file: Express.Multer.File,
+    @CurrentUser() user: UserEntity,
+  ) {
+    return await this.usersService.updateAvatar(user.id, file);
   }
 }
