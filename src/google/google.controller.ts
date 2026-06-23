@@ -16,13 +16,13 @@ import { inspect } from 'node:util';
 import { GoogleService } from './google.service';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { GoogleAuthStatus } from './constants/google.constants';
 import { FRONTEND_ROUTES } from '@/common/constants/frontend-routes.constant';
 import { TimezoneService } from './timezone.service';
 import { DetectTimezoneDto } from './dto/detect-timezone.dto';
+import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
 
 @Controller('google')
 export class GoogleController {
@@ -47,7 +47,7 @@ export class GoogleController {
 
   @Get('connect')
   @Roles(Role.Owner, Role.Admin)
-  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   connectGoogle(
     @Query('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {
@@ -57,7 +57,7 @@ export class GoogleController {
 
   @Post(':schoolId/disconnect')
   @Roles(Role.Owner, Role.Admin)
-  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   async disconnectGoogle(
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {
@@ -99,7 +99,7 @@ export class GoogleController {
 
   @Get(':schoolId/locations')
   @Roles(Role.Owner, Role.Admin)
-  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   async getLocations(
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {
@@ -108,7 +108,7 @@ export class GoogleController {
 
   @Post(':schoolId/locations')
   @Roles(Role.Owner, Role.Admin)
-  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   async saveLocation(
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
     @Body('locationName') locationName: string,

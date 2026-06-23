@@ -25,7 +25,11 @@ export class SchoolRolesGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithAuth>();
 
-    const schoolId = request.headers['x-school-id'] as string | undefined;
+    const schoolId =
+      (request.headers['x-school-id'] as string) ||
+      (request.params?.schoolId as string) ||
+      (request.query?.schoolId as string);
+
     if (!schoolId) {
       throw new BadRequestException('Header "x-school-id" is required');
     }
