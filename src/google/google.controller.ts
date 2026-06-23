@@ -55,6 +55,16 @@ export class GoogleController {
     return { url };
   }
 
+  @Post(':schoolId/disconnect')
+  @Roles(Role.Owner, Role.Admin)
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
+  async disconnectGoogle(
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
+  ) {
+    await this.googleService.disconnectBusinessProfile(schoolId);
+    return { success: true };
+  }
+
   @Get('callback')
   @Redirect('', 302)
   async googleCallback(
@@ -120,8 +130,6 @@ export class GoogleController {
   }
 
   @Get(':schoolId/reviews')
-  @Roles(Role.Owner, Role.Admin)
-  @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
   async getReviews(
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {

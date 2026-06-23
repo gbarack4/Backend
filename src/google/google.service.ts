@@ -357,4 +357,17 @@ export class GoogleService {
       },
     );
   }
+
+  async disconnectBusinessProfile(schoolId: string) {
+    await this.db
+      .update(schema.schools)
+      .set({
+        googleAccessToken: null,
+        googleRefreshToken: null,
+        googleLocationName: null,
+        googleAccountName: null,
+        googleAccountId: null,
+      })
+      .where(eq(schema.schools.id, schoolId));
+  }
 }
