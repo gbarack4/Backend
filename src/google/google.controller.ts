@@ -23,6 +23,14 @@ import { FRONTEND_ROUTES } from '@/common/constants/frontend-routes.constant';
 import { TimezoneService } from './timezone.service';
 import { DetectTimezoneDto } from './dto/detect-timezone.dto';
 import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @Controller('google')
 export class GoogleController {
@@ -40,12 +48,18 @@ export class GoogleController {
   }
 
   @Post('timezone')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Detect timezone by physical address' })
+  @ApiResponse({ status: 200, description: 'Returns detected timezone ID' })
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   async detectTimezone(@Body() body: DetectTimezoneDto) {
     return await this.timezoneService.getTimezoneByAddress(body.address);
   }
 
   @Get('connect')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get Google OAuth connection URL' })
+  @ApiQuery({ name: 'schoolId', type: 'string', format: 'uuid' })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   connectGoogle(
@@ -56,6 +70,13 @@ export class GoogleController {
   }
 
   @Post(':schoolId/disconnect')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disconnect Google Business Profile' })
+  @ApiParam({ name: 'schoolId', type: 'string', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile successfully disconnected',
+  })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   async disconnectGoogle(
@@ -66,6 +87,10 @@ export class GoogleController {
   }
 
   @Get('callback')
+  @ApiOperation({ summary: 'Handle Google OAuth callback redirect' })
+  @ApiQuery({ name: 'code', required: false, type: 'string' })
+  @ApiQuery({ name: 'state', required: false, type: 'string' })
+  @ApiQuery({ name: 'error', required: false, type: 'string' })
   @Redirect('', 302)
   async googleCallback(
     @Query('code') code: string,
@@ -98,6 +123,9 @@ export class GoogleController {
   }
 
   @Get(':schoolId/locations')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Fetch available Google Business locations' })
+  @ApiParam({ name: 'schoolId', type: 'string', format: 'uuid' })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   async getLocations(
@@ -107,6 +135,19 @@ export class GoogleController {
   }
 
   @Post(':schoolId/locations')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Save selected Google Business location' })
+  @ApiParam({ name: 'schoolId', type: 'string', format: 'uuid' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        locationName: { type: 'string', example: 'locations/123456789' },
+        accountName: { type: 'string', example: 'accounts/987654321' },
+      },
+      required: ['locationName', 'accountName'],
+    },
+  })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
   async saveLocation(
@@ -130,6 +171,8 @@ export class GoogleController {
   }
 
   @Get(':schoolId/reviews')
+  @ApiOperation({ summary: 'Get public Google reviews for a school' })
+  @ApiParam({ name: 'schoolId', type: 'string', format: 'uuid' })
   async getReviews(
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {

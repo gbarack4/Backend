@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 
@@ -25,6 +26,16 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type,Authorization,x-school-id',
     credentials: true,
   });
+
+  const config = new DocumentBuilder()
+    .setTitle('DrivingInstructor.pro API')
+    .setDescription('API documentation for Driving School SaaS')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, documentFactory);
+
   const port = process.env.PORT || 8000;
   await app.listen(port, '0.0.0.0');
 }

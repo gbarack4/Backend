@@ -12,6 +12,13 @@ import { ConfigService } from '@nestjs/config';
 import { Webhook } from 'svix';
 import type { Request, Response } from 'express';
 import { UsersService } from './users.service';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 interface ClerkUserEvent {
   type: 'user.created' | 'user.updated' | 'user.deleted';
@@ -29,6 +36,7 @@ interface ClerkUserEvent {
   };
 }
 
+@ApiTags('System Webhooks')
 @Controller('api/webhooks/clerk')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
@@ -39,6 +47,84 @@ export class WebhooksController {
   ) {}
 
   @Post()
+  @ApiOperation({
+    summary: 'Handle incoming Clerk User lifecycle events via Svix webhooks',
+    description:
+      'Processes user creation, profile synchronization, and deletion events directly emitted from Clerk.',
+  })
+  @ApiHeader({
+    name: 'svix-id',
+    description: 'Unique identifier transmitted by Svix for event tracing',
+    required: true,
+  })
+  @ApiHeader({
+    name: 'svix-timestamp',
+    description: 'Unix timestamp indicating when the payload was dispatched',
+    required: true,
+  })
+  @ApiHeader({
+    name: 'svix-signature',
+    description:
+      'Cryptographic signature generated with HMAC SHA256 to verify webhook authenticity',
+    required: true,
+  })
+  @ApiBody({
+    description: 'Clerk User Event raw JSON payload payload',
+    schema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['user.created', 'user.updated', 'user.deleted'],
+          example: 'user.created',
+        },
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'user_2N4vB...' },
+            email_addresses: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  email_address: {
+                    type: 'string',
+                    example: 'student@example.com',
+                  },
+                },
+              },
+            },
+            first_name: { type: 'string', example: 'John' },
+            last_name: { type: 'string', example: 'Doe' },
+            public_metadata: {
+              type: 'object',
+              properties: {
+                role: { type: 'string', example: 'instructor' },
+              },
+            },
+            unsafe_metadata: {
+              type: 'object',
+              properties: {
+                phone_number: { type: 'string', example: '+61412345678' },
+                address: { type: 'string', example: 'Brisbane, QLD' },
+              },
+            },
+          },
+          required: ['id'],
+        },
+      },
+      required: ['type', 'data'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook event processed and verified successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Missing payload, malformed object, or invalid cryptographic signature',
+  })
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Res() res: Response,
