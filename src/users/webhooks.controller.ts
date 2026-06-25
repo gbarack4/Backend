@@ -27,6 +27,7 @@ interface ClerkUserEvent {
     email_addresses?: Array<{ email_address: string }>;
     first_name?: string;
     last_name?: string;
+    image_url?: string;
     public_metadata?: { role?: string };
     unsafe_metadata?: {
       phone_number?: string;
@@ -96,6 +97,10 @@ export class WebhooksController {
             },
             first_name: { type: 'string', example: 'John' },
             last_name: { type: 'string', example: 'Doe' },
+            image_url: {
+              type: 'string',
+              example: 'https://img.clerk.com/default-avatar.png',
+            },
             public_metadata: {
               type: 'object',
               properties: {
@@ -169,6 +174,7 @@ export class WebhooksController {
           public_metadata,
           first_name,
           last_name,
+          image_url,
           unsafe_metadata,
         } = event.data;
 
@@ -189,6 +195,7 @@ export class WebhooksController {
           role,
           firstName: first_name,
           lastName: last_name,
+          avatarUrl: image_url,
           phoneNumber: unsafe_metadata?.phone_number,
           address: unsafe_metadata?.address,
         });

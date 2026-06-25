@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { DB_CONNECTION } from '@/database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from '@/database/schema';
 import { S3Service } from '@/storage/s3.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -29,6 +29,7 @@ export class UsersService {
     role: string;
     firstName?: string;
     lastName?: string;
+    avatarUrl?: string;
     phoneNumber?: string;
     address?: string;
   }) {
@@ -40,6 +41,7 @@ export class UsersService {
         role: data.role,
         firstName: data.firstName,
         lastName: data.lastName,
+        avatarUrl: data.avatarUrl,
         phoneNumber: data.phoneNumber,
         address: data.address,
       })
@@ -52,6 +54,15 @@ export class UsersService {
           lastName: data.lastName,
           phoneNumber: data.phoneNumber,
           address: data.address,
+          avatarUrl: data.avatarUrl
+            ? sql`
+                CASE
+                  WHEN ${schema.users.avatarUrl} IS NULL THEN ${data.avatarUrl}
+                  WHEN ${schema.users.avatarUrl} LIKE '%clerk.com%' THEN ${data.avatarUrl}
+                  ELSE ${schema.users.avatarUrl}
+                END
+              `
+            : sql`${schema.users.avatarUrl}`,
         },
       })
       .returning();
@@ -93,39 +104,73 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
+    let uploadedFileUrl: string | null = null;
+
     try {
       const uploadResult = await this.s3Service.uploadUserAvatar(file);
+      uploadedFileUrl = uploadResult.fileUrl;
 
-      const [updatedUser] = await this.db
-        .update(schema.users)
-        .set({ avatarUrl: uploadResult.fileUrl })
-        .where(eq(schema.users.id, userId))
-        .returning();
-
-      if (!updatedUser) {
-        throw new NotFoundException('User not found during avatar update');
-      }
-
-      if (user.avatarUrl) {
-        try {
-          await this.s3Service.deleteFile(user.avatarUrl);
-        } catch (err) {
-          this.logger.warn(
-            `Failed to delete old avatar: ${user.avatarUrl}`,
-            err,
-          );
-        }
-      }
+      await this.updateUserAvatarInDb(userId, uploadedFileUrl);
+      await this.safelyDeleteOldAvatar(user.avatarUrl);
 
       return {
         message: 'Avatar updated successfully',
-        avatarUrl: uploadResult.fileUrl,
+        avatarUrl: uploadedFileUrl,
       };
     } catch (error) {
-      if (error instanceof HttpException) throw error;
-      this.logger.error(`Avatar update failed for user ${userId}`, error);
-      throw new InternalServerErrorException('Failed to process avatar upload');
+      this.handleAvatarUpdateError(error, userId, uploadedFileUrl);
     }
+  }
+
+  private async updateUserAvatarInDb(userId: string, avatarUrl: string) {
+    const [updatedUser] = await this.db
+      .update(schema.users)
+      .set({ avatarUrl })
+      .where(eq(schema.users.id, userId))
+      .returning();
+
+    if (!updatedUser) {
+      throw new NotFoundException('User not found during avatar update');
+    }
+  }
+
+  private async safelyDeleteOldAvatar(avatarUrl: string | null) {
+    if (!avatarUrl || avatarUrl.includes('clerk.com')) {
+      return;
+    }
+
+    try {
+      await this.s3Service.deleteFile(avatarUrl);
+    } catch (err) {
+      const warnMessage = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Failed to delete old avatar: ${avatarUrl}. ${warnMessage}`,
+      );
+    }
+  }
+
+  private handleAvatarUpdateError(
+    error: unknown,
+    userId: string,
+    uploadedFileUrl: string | null,
+  ): never {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
+    if (uploadedFileUrl) {
+      this.s3Service.deleteFile(uploadedFileUrl).catch(() => {});
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    this.logger.error(
+      `Avatar update failed for user ${userId}: ${errorMessage}`,
+      errorStack,
+    );
+
+    throw new InternalServerErrorException('Failed to process avatar upload');
   }
 
   async getProfile(userId: string) {
