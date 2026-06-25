@@ -17,6 +17,20 @@ export class TimezoneService {
     );
   }
 
+  private suggestDateFormat(countryCode?: string): string {
+    if (!countryCode) return 'dd-mm-yyyy';
+
+    if (countryCode === 'US' || countryCode === 'PH') {
+      return 'mm-dd-yyyy';
+    }
+
+    if (['CN', 'JP', 'KR', 'HU'].includes(countryCode)) {
+      return 'yyyy-mm-dd';
+    }
+
+    return 'dd-mm-yyyy';
+  }
+
   async getTimezoneByAddress(address: string) {
     const geoRes = await fetch(
       `${GOOGLE_ENDPOINTS.GEOCODING}?address=${encodeURIComponent(address)}&key=${this.apiKey}`,
@@ -28,7 +42,12 @@ export class TimezoneService {
       throw new BadRequestException('Could not resolve location from address');
     }
 
-    const { lat, lng } = geoData.results[0].geometry.location;
+    const result = geoData.results[0];
+    const { lat, lng } = result.geometry.location;
+
+    const country = result.address_components?.find((component) =>
+      component.types.includes('country'),
+    );
 
     const timestamp = Math.floor(Date.now() / 1000);
     const tzRes = await fetch(
@@ -43,7 +62,7 @@ export class TimezoneService {
 
     return {
       timeZoneId: tzData.timeZoneId,
-      suggestedDateFormat: 'dd-mm-yyyy',
+      suggestedDateFormat: this.suggestDateFormat(country?.short_name),
     };
   }
 }

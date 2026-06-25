@@ -34,6 +34,11 @@ export interface GoogleGeocodeResponse {
     geometry: {
       location: { lat: number; lng: number };
     };
+    address_components?: {
+      short_name: string;
+      long_name: string;
+      types: string[];
+    }[];
   }[];
 }
 
