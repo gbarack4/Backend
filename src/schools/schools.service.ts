@@ -113,7 +113,7 @@ export class SchoolsService {
 
         await tx.insert(schema.schoolDomains).values({
           schoolId: school.id,
-          domain: `${slug}.${APP_DOMAIN_SUFFIX}`,
+          domain: slug,
           type: 'subdomain',
           isPrimary: true,
         });
@@ -371,7 +371,7 @@ export class SchoolsService {
     if (newPrefix) {
       await tx
         .update(schema.schoolDomains)
-        .set({ domain: `${newPrefix}.${APP_DOMAIN_SUFFIX}` })
+        .set({ domain: newPrefix })
         .where(
           and(
             eq(schema.schoolDomains.schoolId, school.id),

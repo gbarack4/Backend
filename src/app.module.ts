@@ -7,6 +7,7 @@ import clerkConfig from './config/clerk.config';
 import { AuthModule } from './auth/auth.module';
 import { StorageModule } from './storage/storage.module';
 import { GoogleModule } from './google/google.module';
+import { PublicWebsitesModule } from './public-websites/public-websites.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { GoogleModule } from './google/google.module';
     SchoolsModule,
     StorageModule,
     GoogleModule,
+    PublicWebsitesModule,
   ],
   controllers: [],
   providers: [],
