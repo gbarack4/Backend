@@ -2,12 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema';
-
-export interface WebsiteConfigDto {
-  schoolName: string;
-  templateName: string;
-  config: Record<string, any>;
-}
+import { WebsiteConfigDto } from './dto/website-config.dto';
 
 @Injectable()
 export class PublicWebsitesService {
