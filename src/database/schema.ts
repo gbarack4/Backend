@@ -290,6 +290,8 @@ export const instructors = pgTable(
     userId: uuid('user_id').notNull(),
     name: text().notNull(),
     phone: text(),
+    bio: text(),
+    pricePerHour: numeric('price_per_hour', { precision: 10, scale: 2 }),
     status: text().default('active').notNull(),
     createdAt: timestamp('created_at', {
       withTimezone: true,
@@ -306,6 +308,69 @@ export const instructors = pgTable(
     check(
       'instructors_status_check',
       sql`status = ANY (ARRAY['active'::text, 'inactive'::text])`,
+    ),
+  ],
+).enableRLS();
+
+export const cars = pgTable(
+  'cars',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid('school_id').notNull(),
+    instructorId: uuid('instructor_id'),
+    make: text().notNull(),
+    model: text().notNull(),
+    year: integer().notNull(),
+    color: text().notNull(),
+    transmission: text().notNull(),
+    fuel: text().notNull(),
+    imageUrl: text('image_url'),
+    status: text().default('active').notNull(),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    index('idx_cars_school_id').using(
+      'btree',
+      table.schoolId.asc().nullsLast().op('uuid_ops'),
+    ),
+    index('idx_cars_instructor_id').using(
+      'btree',
+      table.instructorId.asc().nullsLast().op('uuid_ops'),
+    ),
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'cars_school_id_fkey',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.instructorId],
+      foreignColumns: [instructors.id],
+      name: 'cars_instructor_id_fkey',
+    }).onDelete('set null'),
+    pgPolicy('isolate_cars', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+    check(
+      'cars_transmission_check',
+      sql`transmission = ANY (ARRAY['Manual'::text, 'Automatic'::text])`,
+    ),
+    check(
+      'cars_fuel_check',
+      sql`fuel = ANY (ARRAY['Petrol'::text, 'Diesel'::text, 'Electric'::text, 'Hybrid'::text, 'LPG'::text])`,
+    ),
+    check(
+      'cars_status_check',
+      sql`status = ANY (ARRAY['active'::text, 'maintenance'::text, 'retired'::text])`,
+    ),
+    check(
+      'cars_year_check',
+      sql`year >= 1990 AND year <= extract(year from now())::int + 1`,
     ),
   ],
 ).enableRLS();
