@@ -38,7 +38,7 @@ interface ClerkUserEvent {
 }
 
 @ApiTags('System Webhooks')
-@Controller('api/webhooks/clerk')
+@Controller('webhooks/clerk')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
 
