@@ -7,10 +7,10 @@ export interface AuthPayload {
 export interface UserEntity {
   id: string;
   email: string;
-  role: string;
 }
 
 export interface RequestWithAuth extends Request {
   authPayload?: AuthPayload;
   currentUser?: UserEntity;
+  instructorId?: string;
 }

@@ -26,7 +26,6 @@ export class UsersService {
   async upsertUser(data: {
     clerkUserId: string;
     email: string;
-    role: string;
     firstName?: string;
     lastName?: string;
     avatarUrl?: string;
@@ -38,7 +37,6 @@ export class UsersService {
       .values({
         clerkUserId: data.clerkUserId,
         email: data.email,
-        role: data.role,
         firstName: data.firstName,
         lastName: data.lastName,
         avatarUrl: data.avatarUrl,
@@ -49,7 +47,6 @@ export class UsersService {
         target: schema.users.clerkUserId,
         set: {
           email: data.email,
-          role: data.role,
           firstName: data.firstName,
           lastName: data.lastName,
           phoneNumber: data.phoneNumber,
@@ -188,7 +185,6 @@ export class UsersService {
       phoneNumber: user.phoneNumber,
       address: user.address,
       avatarUrl: user.avatarUrl,
-      role: user.role,
     };
   }
 

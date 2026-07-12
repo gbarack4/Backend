@@ -32,7 +32,6 @@ interface ClerkUserEvent {
     unsafe_metadata?: {
       phone_number?: string;
       address?: string;
-      role?: string;
     };
   };
 }
@@ -101,12 +100,6 @@ export class WebhooksController {
               type: 'string',
               example: 'https://img.clerk.com/default-avatar.png',
             },
-            public_metadata: {
-              type: 'object',
-              properties: {
-                role: { type: 'string', example: 'instructor' },
-              },
-            },
             unsafe_metadata: {
               type: 'object',
               properties: {
@@ -171,7 +164,6 @@ export class WebhooksController {
         const {
           id,
           email_addresses,
-          public_metadata,
           first_name,
           last_name,
           image_url,
@@ -186,13 +178,9 @@ export class WebhooksController {
           );
         }
 
-        const role =
-          public_metadata?.role || unsafe_metadata?.role || 'student';
-
         await this.usersService.upsertUser({
           clerkUserId: id,
           email,
-          role,
           firstName: first_name,
           lastName: last_name,
           avatarUrl: image_url,

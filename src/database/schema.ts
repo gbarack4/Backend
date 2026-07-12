@@ -72,7 +72,6 @@ export const locations = pgTable(
     suburb: text('suburb'),
     state: text('state'),
     postcode: text('postcode'),
-
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -274,6 +273,7 @@ export const students = pgTable(
       foreignColumns: [users.id],
       name: 'students_user_id_fkey',
     }).onDelete('set null'),
+    unique('students_school_id_user_id_key').on(table.schoolId, table.userId),
     pgPolicy('isolate_students', {
       as: 'permissive',
       for: 'all',
@@ -292,6 +292,21 @@ export const instructors = pgTable(
     phone: text(),
     bio: text(),
     pricePerHour: numeric('price_per_hour', { precision: 10, scale: 2 }),
+    avatarUrl: text('avatar_url'),
+    addressLine1: text('address_line_1'),
+    addressLine2: text('address_line_2'),
+    suburb: text('suburb'),
+    state: text('state'),
+    postcode: text('postcode'),
+    emergencyContact: jsonb('emergency_contact'),
+    driverLicenceNumber: text('driver_licence_number'),
+    driverLicenceExpiry: text('driver_licence_expiry'),
+    instructorAccreditationNumber: text('instructor_accreditation_number'),
+    accreditationExpiry: text('accreditation_expiry'),
+    yearsOfExperience: integer('years_of_experience'),
+    transmissionType: text('transmission_type'),
+    languagesSpoken: text('languages_spoken'),
+    documents: jsonb('documents'),
     status: text().default('active').notNull(),
     createdAt: timestamp('created_at', {
       withTimezone: true,
@@ -316,14 +331,15 @@ export const cars = pgTable(
   'cars',
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
-    schoolId: uuid('school_id').notNull(),
+    schoolId: uuid('school_id'),
     instructorId: uuid('instructor_id'),
     make: text().notNull(),
     model: text().notNull(),
     year: integer().notNull(),
     color: text().notNull(),
     transmission: text().notNull(),
-    fuel: text().notNull(),
+    fuel: text().default('Petrol').notNull(),
+    dualControl: boolean('dual_control').default(false).notNull(),
     imageUrl: text('image_url'),
     status: text().default('active').notNull(),
     createdAt: timestamp('created_at', {
@@ -408,7 +424,6 @@ export const users = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     clerkUserId: text('clerk_user_id').notNull(),
     email: text().notNull(),
-    role: text().notNull(),
     firstName: text('first_name'),
     lastName: text('last_name'),
     phoneNumber: text('phone_number'),
@@ -422,10 +437,6 @@ export const users = pgTable(
   (table) => [
     unique('users_clerk_user_id_key').on(table.clerkUserId),
     unique('users_email_key').on(table.email),
-    check(
-      'users_role_check',
-      sql`role = ANY (ARRAY['owner'::text, 'admin'::text, 'staff'::text, 'instructor'::text, 'student'::text])`,
-    ),
   ],
 ).enableRLS();
 
@@ -520,7 +531,14 @@ export const bookings = pgTable(
       as: 'permissive',
       for: 'all',
       to: ['public'],
-      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+      using: sql`
+        (school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)
+        OR 
+        (instructor_id IN (
+          SELECT id FROM instructors 
+          WHERE user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid
+        ))
+      `,
     }),
     check(
       'bookings_status_check',
