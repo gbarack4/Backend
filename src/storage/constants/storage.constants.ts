@@ -1,10 +1,15 @@
-import { MaxFileSizeValidator, ParseFilePipe } from '@nestjs/common';
+import {
+  MaxFileSizeValidator,
+  FileTypeValidator,
+  ParseFilePipe,
+} from '@nestjs/common';
 
 export const ALLOWED_FILE_TYPES = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
+  pdf: 'application/pdf',
 } as const;
 
 export type AllowedExtension = keyof typeof ALLOWED_FILE_TYPES;
@@ -15,5 +20,6 @@ export const PRESIGNED_URL_TTL_SECONDS = 300;
 export const fileValidationPipe = new ParseFilePipe({
   validators: [
     new MaxFileSizeValidator({ maxSize: MAX_PRESIGNED_UPLOAD_BYTES }),
+    new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp|pdf)$/i }),
   ],
 });

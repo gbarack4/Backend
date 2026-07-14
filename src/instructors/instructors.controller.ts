@@ -95,6 +95,17 @@ export class InstructorsController {
     return await this.instructorsService.uploadAvatar(file);
   }
 
+  @Post('upload-document')
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload instructor document (PDF/Image)' })
+  @ApiConsumes('multipart/form-data')
+  async uploadDocument(
+    @UploadedFile(fileValidationPipe) file: Express.Multer.File,
+  ) {
+    return await this.instructorsService.uploadDocument(file);
+  }
+
   @Get('onboarding/draft')
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   @ApiOperation({ summary: 'Get current onboarding draft' })

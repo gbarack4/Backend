@@ -136,6 +136,23 @@ export class InstructorsService {
     }
   }
 
+  async uploadDocument(file: Express.Multer.File) {
+    try {
+      const uploadResult = await this.s3Service.uploadInstructorDocument(file);
+
+      return {
+        success: true,
+        fileUrl: uploadResult.fileUrl,
+        key: uploadResult.key,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to upload instructor document to S3: ${error}`);
+      throw new InternalServerErrorException(
+        'Could not process document upload',
+      );
+    }
+  }
+
   async getDraft(clerkUserId: string) {
     const draft = await this.db.query.instructorOnboardingDrafts.findFirst({
       where: eq(instructorOnboardingDrafts.clerkUserId, clerkUserId),

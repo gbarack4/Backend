@@ -121,6 +121,8 @@ export class S3Service {
         return `users/avatars/${uniqueFileName}`;
       case UploadType.INSTRUCTOR_AVATAR:
         return `instructors/avatars/${uniqueFileName}`;
+      case UploadType.INSTRUCTOR_DOCUMENT:
+        return `instructors/documents/${uniqueFileName}`;
       default: {
         const _: never = type;
         throw new Error(`Unreachable: Unsupported upload type ${String(_)}`);
@@ -294,5 +296,20 @@ export class S3Service {
         this.formatError(error),
       );
     }
+  }
+
+  async uploadInstructorDocument(
+    file: Express.Multer.File,
+  ): Promise<UploadResponseDto> {
+    const uniqueFileName = this.generateUniqueFileName(
+      file.originalname,
+      file.mimetype,
+    );
+    const s3Key = this.buildS3Key(
+      UploadType.INSTRUCTOR_DOCUMENT,
+      uniqueFileName,
+    );
+
+    return this.executeUpload(s3Key, file);
   }
 }
