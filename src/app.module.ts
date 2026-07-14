@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { StorageModule } from './storage/storage.module';
 import { GoogleModule } from './google/google.module';
 import { PublicWebsitesModule } from './public-websites/public-websites.module';
+import { InstructorsModule } from './instructors/instructors.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PublicWebsitesModule } from './public-websites/public-websites.module';
     StorageModule,
     GoogleModule,
     PublicWebsitesModule,
+    InstructorsModule,
   ],
   controllers: [],
   providers: [],

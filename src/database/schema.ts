@@ -935,3 +935,17 @@ export const schoolWebsites = pgTable(
     }),
   ],
 ).enableRLS();
+
+export const instructorOnboardingDrafts = pgTable(
+  'instructor_onboarding_drafts',
+  {
+    clerkUserId: text('clerk_user_id')
+      .primaryKey()
+      .references(() => users.clerkUserId, { onDelete: 'cascade' }),
+    currentStepIndex: integer('current_step_index').notNull().default(0),
+    formData: jsonb('form_data').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);

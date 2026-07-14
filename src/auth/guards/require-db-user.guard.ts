@@ -26,7 +26,10 @@ export class RequireDbUserGuard implements CanActivate {
       throw new UnauthorizedException('User profile not found in database');
     }
 
-    request.currentUser = dbUser;
+    request.currentUser = {
+      ...dbUser,
+      clerkId: request.authPayload.clerkId,
+    };
 
     return true;
   }
