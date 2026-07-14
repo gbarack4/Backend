@@ -64,7 +64,7 @@ export class InstructorsController {
     @CurrentUser() user: UserEntity,
     @Body() dto: OnboardInstructorDto,
   ): Promise<OnboardResponse> {
-    return await this.instructorsService.onboard(user.id, dto);
+    return await this.instructorsService.onboard(user.clerkId, dto);
   }
 
   @Post('upload-avatar')
