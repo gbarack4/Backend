@@ -27,12 +27,7 @@ import type { UserEntity } from '@/auth/interfaces/auth.interface';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { fileValidationPipe } from '@/storage/constants/storage.constants';
 import { UpsertDraftDto } from './dto/upsert-draft.dto';
-
-interface OnboardResponse {
-  success: boolean;
-  message: string;
-  instructorId: string;
-}
+import { OnboardResponse } from './interface/instrutors.interface';
 
 @ApiTags('Instructors')
 @ApiBearerAuth()
@@ -121,5 +116,22 @@ export class InstructorsController {
     @Body() dto: UpsertDraftDto,
   ) {
     return await this.instructorsService.upsertDraft(user.clerkId, dto);
+  }
+
+  @Get('profile')
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @ApiOperation({
+    summary: 'Get completed instructor profile with vehicle details',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Instructor profile retrieved successfully.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Global user identity or instructor profile not found.',
+  })
+  async getProfile(@CurrentUser() user: UserEntity) {
+    return this.instructorsService.getProfile(user.clerkId);
   }
 }

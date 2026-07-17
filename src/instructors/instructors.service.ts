@@ -181,4 +181,44 @@ export class InstructorsService {
 
     return { success: true };
   }
+
+  async getProfile(clerkUserId: string) {
+    const userRecords = await this.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.clerkUserId, clerkUserId))
+      .limit(1);
+
+    if (!userRecords.length) {
+      throw new NotFoundException('Global user identity not found');
+    }
+
+    const userId = userRecords[0].id;
+
+    const profileRecords = await this.db
+      .select({
+        instructor: schema.instructors,
+        car: schema.cars,
+      })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId))
+      .leftJoin(
+        schema.cars,
+        eq(schema.cars.instructorId, schema.instructors.id),
+      );
+
+    if (!profileRecords.length) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    const { instructor, car } = profileRecords[0];
+
+    return {
+      success: true,
+      data: {
+        ...instructor,
+        car: car || null,
+      },
+    };
+  }
 }
