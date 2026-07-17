@@ -1,0 +1,3 @@
+-- Custom SQL migration file, put your code below! --
+ALTER TABLE "instructor_onboarding_drafts" DROP CONSTRAINT IF EXISTS "instructor_onboarding_drafts_clerk_user_id_users_clerk_user_id_";
+ALTER TABLE "instructor_onboarding_drafts" ADD CONSTRAINT "instructor_onboarding_drafts_clerk_user_id_users_clerk_user_id_fk" FOREIGN KEY ("clerk_user_id") REFERENCES "public"."users"("clerk_user_id") ON DELETE cascade ON UPDATE no action;
