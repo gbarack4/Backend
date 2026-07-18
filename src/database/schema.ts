@@ -336,7 +336,7 @@ export const cars = pgTable(
     make: text().notNull(),
     model: text().notNull(),
     year: integer().notNull(),
-    registrationNumber: text('registration_number'),
+    registrationNumber: text('registration_number').notNull(),
     color: text().notNull(),
     transmission: text().notNull(),
     fuel: text().default('Petrol').notNull(),
