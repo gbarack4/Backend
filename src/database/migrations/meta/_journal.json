@@ -120,6 +120,13 @@
       "when": 1784291581480,
       "tag": "0016_fix_drafts_fk_and_drop_ai_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784355209613,
+      "tag": "0017_add_registration_number_to_cars",
+      "breakpoints": true
     }
   ]
 }

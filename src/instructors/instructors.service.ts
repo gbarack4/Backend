@@ -94,6 +94,7 @@ export class InstructorsService {
           make: dto.vehicleMake,
           model: dto.vehicleModel,
           year: Number.parseInt(dto.vehicleYear),
+          registrationNumber: dto.registrationNumber,
           transmission:
             dto.vehicleTransmission === 'automatic' ? 'Automatic' : 'Manual',
           dualControl: dto.dualControlVehicle === 'yes',
