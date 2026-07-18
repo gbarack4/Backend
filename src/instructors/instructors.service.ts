@@ -122,9 +122,12 @@ export class InstructorsService {
     }
   }
 
-  async uploadAvatar(file: Express.Multer.File) {
+  async uploadAvatar(clerkUserId: string, file: Express.Multer.File) {
     try {
-      const uploadResult = await this.s3Service.uploadInstructorAvatar(file);
+      const uploadResult = await this.s3Service.uploadInstructorAvatar(
+        clerkUserId,
+        file,
+      );
 
       return {
         success: true,
@@ -137,14 +140,23 @@ export class InstructorsService {
     }
   }
 
-  async uploadDocument(file: Express.Multer.File) {
+  async uploadDocument(
+    clerkUserId: string,
+    documentType: string,
+    file: Express.Multer.File,
+  ) {
     try {
-      const uploadResult = await this.s3Service.uploadInstructorDocument(file);
+      const uploadResult = await this.s3Service.uploadInstructorDocument(
+        clerkUserId,
+        documentType,
+        file,
+      );
 
       return {
         success: true,
         fileUrl: uploadResult.fileUrl,
         key: uploadResult.key,
+        documentType,
       };
     } catch (error) {
       this.logger.error(`Failed to upload instructor document to S3: ${error}`);

@@ -9,6 +9,7 @@ import {
   UploadedFile,
   Get,
   Patch,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -85,9 +86,10 @@ export class InstructorsController {
     description: 'Instructor avatar successfully uploaded',
   })
   async uploadAvatar(
+    @CurrentUser() user: UserEntity,
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
   ) {
-    return await this.instructorsService.uploadAvatar(file);
+    return await this.instructorsService.uploadAvatar(user.clerkId, file);
   }
 
   @Post('upload-document')
@@ -96,9 +98,15 @@ export class InstructorsController {
   @ApiOperation({ summary: 'Upload instructor document (PDF/Image)' })
   @ApiConsumes('multipart/form-data')
   async uploadDocument(
+    @CurrentUser() user: UserEntity,
+    @Query('documentType') documentType: string,
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
   ) {
-    return await this.instructorsService.uploadDocument(file);
+    return await this.instructorsService.uploadDocument(
+      user.clerkId,
+      documentType,
+      file,
+    );
   }
 
   @Get('onboarding/draft')

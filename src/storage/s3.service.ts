@@ -119,10 +119,6 @@ export class S3Service {
         return `schools/${schoolId}/cover-${uniqueFileName}`;
       case UploadType.USER_AVATAR:
         return `users/avatars/${uniqueFileName}`;
-      case UploadType.INSTRUCTOR_AVATAR:
-        return `instructors/avatars/${uniqueFileName}`;
-      case UploadType.INSTRUCTOR_DOCUMENT:
-        return `instructors/documents/${uniqueFileName}`;
       default: {
         const _: never = type;
         throw new Error(`Unreachable: Unsupported upload type ${String(_)}`);
@@ -264,14 +260,12 @@ export class S3Service {
   }
 
   async uploadInstructorAvatar(
+    clerkUserId: string,
     file: Express.Multer.File,
   ): Promise<UploadResponseDto> {
-    const uniqueFileName = this.generateUniqueFileName(
-      file.originalname,
-      file.mimetype,
-    );
-    const s3Key = this.buildS3Key(UploadType.INSTRUCTOR_AVATAR, uniqueFileName);
-
+    const extension = this.getFileExtension(file.originalname);
+    this.validateFile(extension, file.mimetype);
+    const s3Key = `instructors/${clerkUserId}/avatar`;
     return this.executeUpload(s3Key, file);
   }
 
@@ -299,16 +293,14 @@ export class S3Service {
   }
 
   async uploadInstructorDocument(
+    clerkUserId: string,
+    documentType: string,
     file: Express.Multer.File,
   ): Promise<UploadResponseDto> {
-    const uniqueFileName = this.generateUniqueFileName(
-      file.originalname,
-      file.mimetype,
-    );
-    const s3Key = this.buildS3Key(
-      UploadType.INSTRUCTOR_DOCUMENT,
-      uniqueFileName,
-    );
+    const extension = this.getFileExtension(file.originalname);
+    this.validateFile(extension, file.mimetype);
+
+    const s3Key = `instructors/${clerkUserId}/documents/${documentType}`;
 
     return this.executeUpload(s3Key, file);
   }
