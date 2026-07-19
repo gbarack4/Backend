@@ -339,7 +339,7 @@ export const cars = pgTable(
     registrationNumber: text('registration_number').notNull(),
     color: text().notNull(),
     transmission: text().notNull(),
-    fuel: text().default('Petrol').notNull(),
+    fuel: text().default('petrol').notNull(),
     dualControl: boolean('dual_control').default(false).notNull(),
     imageUrl: text('image_url'),
     status: text().default('active').notNull(),
@@ -375,11 +375,11 @@ export const cars = pgTable(
     }),
     check(
       'cars_transmission_check',
-      sql`transmission = ANY (ARRAY['Manual'::text, 'Automatic'::text])`,
+      sql`transmission = ANY (ARRAY['manual'::text, 'automatic'::text])`,
     ),
     check(
       'cars_fuel_check',
-      sql`fuel = ANY (ARRAY['Petrol'::text, 'Diesel'::text, 'Electric'::text, 'Hybrid'::text, 'LPG'::text])`,
+      sql`fuel = ANY (ARRAY['petrol'::text, 'diesel'::text, 'electric'::text, 'hybrid'::text, 'lpg'::text])`,
     ),
     check(
       'cars_status_check',

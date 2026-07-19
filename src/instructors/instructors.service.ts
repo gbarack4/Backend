@@ -118,11 +118,10 @@ export class InstructorsService {
           model: dto.vehicleModel,
           year: Number.parseInt(dto.vehicleYear),
           registrationNumber: dto.registrationNumber,
-          transmission:
-            dto.vehicleTransmission === 'automatic' ? 'Automatic' : 'Manual',
+          transmission: dto.vehicleTransmission,
           dualControl: dto.dualControlVehicle === 'yes',
-          color: 'Unspecified',
-          fuel: 'Petrol',
+          color: 'unspecified',
+          fuel: 'petrol',
         });
 
         await tx
@@ -359,15 +358,8 @@ export class InstructorsService {
         carUpdates.registrationNumber = dto.registrationNumber;
       if (dto.dualControl !== undefined)
         carUpdates.dualControl = dto.dualControl === 'yes';
-
       if (dto.transmission !== undefined) {
-        const transmissionMap: Record<string, 'Automatic' | 'Manual' | 'Both'> =
-          {
-            automatic: 'Automatic',
-            manual: 'Manual',
-            both: 'Both',
-          };
-        carUpdates.transmission = transmissionMap[dto.transmission];
+        carUpdates.transmission = dto.transmission;
       }
 
       if (Object.keys(carUpdates).length > 0) {
