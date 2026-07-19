@@ -122,12 +122,23 @@ export class InstructorsService {
     }
   }
 
-  async uploadAvatar(clerkUserId: string, file: Express.Multer.File) {
+  async uploadAvatar(
+    clerkUserId: string,
+    userId: string,
+    file: Express.Multer.File,
+    oldFileUrl?: string | null,
+  ) {
     try {
       const uploadResult = await this.s3Service.uploadInstructorAvatar(
         clerkUserId,
         file,
+        oldFileUrl,
       );
+
+      await this.db
+        .update(schema.instructors)
+        .set({ avatarUrl: uploadResult.fileUrl })
+        .where(eq(schema.instructors.userId, userId));
 
       return {
         success: true,
@@ -142,15 +153,36 @@ export class InstructorsService {
 
   async uploadDocument(
     clerkUserId: string,
+    userId: string,
     documentType: string,
     file: Express.Multer.File,
+    oldFileUrl?: string | null,
   ) {
     try {
       const uploadResult = await this.s3Service.uploadInstructorDocument(
         clerkUserId,
         documentType,
         file,
+        oldFileUrl,
       );
+
+      const instructor = await this.db.query.instructors.findFirst({
+        where: eq(schema.instructors.userId, userId),
+      });
+
+      if (!instructor) {
+        throw new NotFoundException('Instructor profile not found');
+      }
+
+      const updatedDocuments = {
+        ...(instructor.documents as Record<string, any>),
+        [documentType]: uploadResult.fileUrl,
+      };
+
+      await this.db
+        .update(schema.instructors)
+        .set({ documents: updatedDocuments })
+        .where(eq(schema.instructors.id, instructor.id));
 
       return {
         success: true,

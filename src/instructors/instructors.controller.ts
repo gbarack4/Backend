@@ -9,7 +9,6 @@ import {
   UploadedFile,
   Get,
   Patch,
-  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -29,6 +28,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { fileValidationPipe } from '@/storage/constants/storage.constants';
 import { UpsertDraftDto } from './dto/upsert-draft.dto';
 import { OnboardResponse } from './interface/instrutors.interface';
+import { UploadDocumentDto } from './dto/upload-document.dto';
+import { UploadAvatarDto } from './dto/upload-avatar.dto';
 
 @ApiTags('Instructors')
 @ApiBearerAuth()
@@ -87,9 +88,15 @@ export class InstructorsController {
   })
   async uploadAvatar(
     @CurrentUser() user: UserEntity,
+    @Body() body: UploadAvatarDto,
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
   ) {
-    return await this.instructorsService.uploadAvatar(user.clerkId, file);
+    return await this.instructorsService.uploadAvatar(
+      user.clerkId,
+      user.id,
+      file,
+      body.oldFileUrl,
+    );
   }
 
   @Post('upload-document')
@@ -97,15 +104,18 @@ export class InstructorsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload instructor document (PDF/Image)' })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UploadDocumentDto })
   async uploadDocument(
     @CurrentUser() user: UserEntity,
-    @Query('documentType') documentType: string,
+    @Body() body: UploadDocumentDto,
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
   ) {
     return await this.instructorsService.uploadDocument(
       user.clerkId,
-      documentType,
+      user.id,
+      body.documentType,
       file,
+      body.oldFileUrl,
     );
   }
 

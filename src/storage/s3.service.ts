@@ -103,22 +103,37 @@ export class S3Service {
   private buildS3Key(
     type: UploadType,
     uniqueFileName: string,
-    schoolId?: string,
+    entityId?: string,
+    subType?: string,
   ): string {
     if (
       (type === UploadType.SCHOOL_LOGO || type === UploadType.SCHOOL_COVER) &&
-      !schoolId
+      !entityId
     ) {
       throw new BadRequestException('School ID is required for school uploads');
     }
 
+    if (
+      (type === UploadType.INSTRUCTOR_AVATAR ||
+        type === UploadType.INSTRUCTOR_DOCUMENT) &&
+      !entityId
+    ) {
+      throw new BadRequestException('Instructor ID is required');
+    }
+
     switch (type) {
       case UploadType.SCHOOL_LOGO:
-        return `schools/${schoolId}/logo-${uniqueFileName}`;
+        return `schools/${entityId}/logo-${uniqueFileName}`;
       case UploadType.SCHOOL_COVER:
-        return `schools/${schoolId}/cover-${uniqueFileName}`;
+        return `schools/${entityId}/cover-${uniqueFileName}`;
       case UploadType.USER_AVATAR:
         return `users/avatars/${uniqueFileName}`;
+      case UploadType.INSTRUCTOR_AVATAR:
+        return `instructors/${entityId}/avatars/${uniqueFileName}`;
+      case UploadType.INSTRUCTOR_DOCUMENT:
+        if (!subType)
+          throw new BadRequestException('Document type is required');
+        return `instructors/${entityId}/documents/${subType}/${uniqueFileName}`;
       default: {
         const _: never = type;
         throw new Error(`Unreachable: Unsupported upload type ${String(_)}`);
@@ -151,6 +166,27 @@ export class S3Service {
       );
       throw new BadRequestException('Could not upload file');
     }
+  }
+
+  private async safeUpload(
+    file: Express.Multer.File,
+    type: UploadType,
+    entityId?: string,
+    oldFileUrl?: string | null,
+    subType?: string,
+  ): Promise<UploadResponseDto> {
+    if (oldFileUrl) {
+      await this.deleteFile(oldFileUrl);
+    }
+
+    const uniqueFileName = this.generateUniqueFileName(
+      file.originalname,
+      file.mimetype,
+    );
+
+    const s3Key = this.buildS3Key(type, uniqueFileName, entityId, subType);
+
+    return this.executeUpload(s3Key, file);
   }
 
   // ---------------------------------------------------------------------
@@ -237,36 +273,44 @@ export class S3Service {
     schoolId: string,
     file: Express.Multer.File,
     type: UploadType.SCHOOL_LOGO | UploadType.SCHOOL_COVER,
+    oldFileUrl?: string | null,
   ): Promise<UploadResponseDto> {
-    const uniqueFileName = this.generateUniqueFileName(
-      file.originalname,
-      file.mimetype,
-    );
-    const s3Key = this.buildS3Key(type, uniqueFileName, schoolId);
-
-    return this.executeUpload(s3Key, file);
+    return this.safeUpload(file, type, schoolId, oldFileUrl);
   }
 
   async uploadUserAvatar(
     file: Express.Multer.File,
+    oldFileUrl?: string | null,
   ): Promise<UploadResponseDto> {
-    const uniqueFileName = this.generateUniqueFileName(
-      file.originalname,
-      file.mimetype,
-    );
-    const s3Key = this.buildS3Key(UploadType.USER_AVATAR, uniqueFileName);
-
-    return this.executeUpload(s3Key, file);
+    return this.safeUpload(file, UploadType.USER_AVATAR, undefined, oldFileUrl);
   }
 
   async uploadInstructorAvatar(
     clerkUserId: string,
     file: Express.Multer.File,
+    oldFileUrl?: string | null,
   ): Promise<UploadResponseDto> {
-    const extension = this.getFileExtension(file.originalname);
-    this.validateFile(extension, file.mimetype);
-    const s3Key = `instructors/${clerkUserId}/avatar`;
-    return this.executeUpload(s3Key, file);
+    return this.safeUpload(
+      file,
+      UploadType.INSTRUCTOR_AVATAR,
+      clerkUserId,
+      oldFileUrl,
+    );
+  }
+
+  async uploadInstructorDocument(
+    clerkUserId: string,
+    documentType: string,
+    file: Express.Multer.File,
+    oldFileUrl?: string | null,
+  ): Promise<UploadResponseDto> {
+    return this.safeUpload(
+      file,
+      UploadType.INSTRUCTOR_DOCUMENT,
+      clerkUserId,
+      oldFileUrl,
+      documentType,
+    );
   }
 
   async deleteFile(fileUrlOrKey: string): Promise<void> {
@@ -290,18 +334,5 @@ export class S3Service {
         this.formatError(error),
       );
     }
-  }
-
-  async uploadInstructorDocument(
-    clerkUserId: string,
-    documentType: string,
-    file: Express.Multer.File,
-  ): Promise<UploadResponseDto> {
-    const extension = this.getFileExtension(file.originalname);
-    this.validateFile(extension, file.mimetype);
-
-    const s3Key = `instructors/${clerkUserId}/documents/${documentType}`;
-
-    return this.executeUpload(s3Key, file);
   }
 }
