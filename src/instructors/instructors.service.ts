@@ -14,6 +14,8 @@ import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
 import { S3Service } from '@/storage/s3.service';
 import { instructorOnboardingDrafts } from '@/database/schema';
 import { UpsertDraftDto } from './dto/upsert-draft.dto';
+import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
+import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 
 @Injectable()
 export class InstructorsService {
@@ -24,6 +26,27 @@ export class InstructorsService {
     private readonly db: NodePgDatabase<typeof schema>,
     private readonly s3Service: S3Service,
   ) {}
+
+  private buildUserUpdates(dto: UpdatePersonalInfoDto) {
+    const updates: Partial<typeof schema.users.$inferInsert> = {};
+    if (dto.firstName) updates.firstName = dto.firstName;
+    if (dto.lastName) updates.lastName = dto.lastName;
+    if (dto.phone) updates.phoneNumber = dto.phone;
+    return updates;
+  }
+
+  private buildInstructorAddressUpdates(
+    address?: UpdatePersonalInfoDto['address'],
+  ) {
+    if (!address) return {};
+    const updates: Partial<typeof schema.instructors.$inferInsert> = {};
+    if (address.line1 !== undefined) updates.addressLine1 = address.line1;
+    if (address.line2 !== undefined) updates.addressLine2 = address.line2;
+    if (address.suburb !== undefined) updates.suburb = address.suburb;
+    if (address.state !== undefined) updates.state = address.state;
+    if (address.postcode !== undefined) updates.postcode = address.postcode;
+    return updates;
+  }
 
   async onboard(clerkUserId: string, dto: OnboardInstructorDto) {
     const userRecords = await this.db
@@ -265,5 +288,99 @@ export class InstructorsService {
         car: car || null,
       },
     };
+  }
+
+  async updatePersonalInfo(userId: string, dto: UpdatePersonalInfoDto) {
+    try {
+      return await this.db.transaction(async (tx) => {
+        const userUpdates = this.buildUserUpdates(dto);
+        if (Object.keys(userUpdates).length > 0) {
+          await tx
+            .update(schema.users)
+            .set(userUpdates)
+            .where(eq(schema.users.id, userId));
+        }
+
+        const instructor = await tx.query.instructors.findFirst({
+          where: eq(schema.instructors.userId, userId),
+        });
+
+        if (!instructor)
+          throw new NotFoundException('Instructor profile not found');
+
+        const instructorUpdates: Partial<
+          typeof schema.instructors.$inferInsert
+        > = {
+          ...this.buildInstructorAddressUpdates(dto.address),
+        };
+
+        if (dto.phone) instructorUpdates.phone = dto.phone;
+
+        if (dto.firstName || dto.lastName) {
+          const [updatedUser] = await tx
+            .select()
+            .from(schema.users)
+            .where(eq(schema.users.id, userId));
+
+          instructorUpdates.name =
+            `${updatedUser.firstName || ''} ${updatedUser.lastName || ''}`.trim();
+        }
+
+        if (Object.keys(instructorUpdates).length > 0) {
+          await tx
+            .update(schema.instructors)
+            .set(instructorUpdates)
+            .where(eq(schema.instructors.id, instructor.id));
+        }
+
+        return { success: true, message: 'Personal info updated successfully' };
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update personal info: ${error}`);
+      throw new InternalServerErrorException('Failed to update personal info');
+    }
+  }
+
+  async updateVehicle(userId: string, dto: UpdateVehicleDto) {
+    try {
+      const instructor = await this.db.query.instructors.findFirst({
+        where: eq(schema.instructors.userId, userId),
+      });
+
+      if (!instructor)
+        throw new NotFoundException('Instructor profile not found');
+
+      const carUpdates: Partial<typeof schema.cars.$inferInsert> = {};
+
+      if (dto.make !== undefined) carUpdates.make = dto.make;
+      if (dto.model !== undefined) carUpdates.model = dto.model;
+      if (dto.year !== undefined) carUpdates.year = Number.parseInt(dto.year);
+      if (dto.registrationNumber !== undefined)
+        carUpdates.registrationNumber = dto.registrationNumber;
+      if (dto.dualControl !== undefined)
+        carUpdates.dualControl = dto.dualControl === 'yes';
+
+      if (dto.transmission !== undefined) {
+        const transmissionMap: Record<string, 'Automatic' | 'Manual' | 'Both'> =
+          {
+            automatic: 'Automatic',
+            manual: 'Manual',
+            both: 'Both',
+          };
+        carUpdates.transmission = transmissionMap[dto.transmission];
+      }
+
+      if (Object.keys(carUpdates).length > 0) {
+        await this.db
+          .update(schema.cars)
+          .set(carUpdates)
+          .where(eq(schema.cars.instructorId, instructor.id));
+      }
+
+      return { success: true, message: 'Vehicle updated successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to update vehicle: ${error}`);
+      throw new InternalServerErrorException('Failed to update vehicle');
+    }
   }
 }

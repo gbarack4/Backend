@@ -30,6 +30,8 @@ import { UpsertDraftDto } from './dto/upsert-draft.dto';
 import { OnboardResponse } from './interface/instrutors.interface';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { UploadAvatarDto } from './dto/upload-avatar.dto';
+import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
+import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 
 @ApiTags('Instructors')
 @ApiBearerAuth()
@@ -151,5 +153,25 @@ export class InstructorsController {
   })
   async getProfile(@CurrentUser() user: UserEntity) {
     return this.instructorsService.getProfile(user.clerkId);
+  }
+
+  @Patch('personal-info')
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @ApiOperation({ summary: 'Update instructor personal information' })
+  async updatePersonalInfo(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdatePersonalInfoDto,
+  ) {
+    return await this.instructorsService.updatePersonalInfo(user.id, dto);
+  }
+
+  @Patch('vehicle')
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @ApiOperation({ summary: 'Update instructor vehicle details' })
+  async updateVehicle(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateVehicleDto,
+  ) {
+    return await this.instructorsService.updateVehicle(user.id, dto);
   }
 }
