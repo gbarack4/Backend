@@ -192,19 +192,17 @@ export class InstructorsService {
         where: eq(schema.instructors.userId, userId),
       });
 
-      if (!instructor) {
-        throw new NotFoundException('Instructor profile not found');
+      if (instructor) {
+        const updatedDocuments = {
+          ...(instructor.documents as Record<string, any>),
+          [documentType]: uploadResult.fileUrl,
+        };
+
+        await this.db
+          .update(schema.instructors)
+          .set({ documents: updatedDocuments })
+          .where(eq(schema.instructors.id, instructor.id));
       }
-
-      const updatedDocuments = {
-        ...(instructor.documents as Record<string, any>),
-        [documentType]: uploadResult.fileUrl,
-      };
-
-      await this.db
-        .update(schema.instructors)
-        .set({ documents: updatedDocuments })
-        .where(eq(schema.instructors.id, instructor.id));
 
       return {
         success: true,
