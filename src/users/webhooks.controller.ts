@@ -6,6 +6,7 @@ import {
   BadRequestException,
   HttpStatus,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +20,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { StudentsService } from '@/students/students.service';
+import { DB_CONNECTION } from '@/database/database.module';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import * as schema from '@/database/schema';
 
 interface ClerkUserEvent {
   type: 'user.created' | 'user.updated' | 'user.deleted';
@@ -32,6 +37,7 @@ interface ClerkUserEvent {
     unsafe_metadata?: {
       phone_number?: string;
       address?: string;
+      schoolId?: string;
     };
   };
 }
@@ -44,6 +50,9 @@ export class WebhooksController {
   constructor(
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly studentsService: StudentsService,
+    @Inject(DB_CONNECTION)
+    private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   @Post()
@@ -177,15 +186,44 @@ export class WebhooksController {
             'User email is required but missing from Clerk payload',
           );
         }
+        const schoolId = unsafe_metadata?.schoolId;
 
-        await this.usersService.upsertUser({
-          clerkUserId: id,
-          email,
-          firstName: first_name,
-          lastName: last_name,
-          avatarUrl: image_url,
-          phoneNumber: unsafe_metadata?.phone_number,
-          address: unsafe_metadata?.address,
+        await this.db.transaction(async (tx) => {
+          const dbUser = await this.usersService.upsertUser(
+            {
+              clerkUserId: id,
+              email,
+              firstName: first_name,
+              lastName: last_name,
+              avatarUrl: image_url,
+              phoneNumber: unsafe_metadata?.phone_number,
+              address: unsafe_metadata?.address,
+            },
+            tx,
+          );
+
+          if (!dbUser?.id) {
+            throw new Error(
+              `Failed to get userId after upserting user ${email}`,
+            );
+          }
+
+          if (schoolId) {
+            const fullName =
+              [first_name, last_name].filter(Boolean).join(' ') ||
+              email.split('@')[0];
+
+            await this.studentsService.upsertStudent(
+              {
+                userId: dbUser.id,
+                schoolId,
+                name: fullName,
+                email,
+                phone: unsafe_metadata?.phone_number,
+              },
+              tx,
+            );
+          }
         });
       }
 

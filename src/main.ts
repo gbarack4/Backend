@@ -16,13 +16,21 @@ async function bootstrap() {
     }),
   );
 
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
+  const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
     : [];
 
+  const allowedOrigins = [
+    /^http:\/\/[a-z0-9-]+\.localhost:3002$/,
+    'http://localhost:3002',
+    /^https:\/\/[a-z0-9-]+\.driveinstructor\.pro$/,
+    'https://driveinstructor.pro',
+    ...envOrigins,
+  ];
+
   app.enableCors({
     origin: allowedOrigins,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type,Authorization,x-school-id',
     credentials: true,
   });

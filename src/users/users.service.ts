@@ -23,16 +23,19 @@ export class UsersService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async upsertUser(data: {
-    clerkUserId: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    avatarUrl?: string;
-    phoneNumber?: string;
-    address?: string;
-  }) {
-    const [user] = await this.db
+  async upsertUser(
+    data: {
+      clerkUserId: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+      phoneNumber?: string;
+      address?: string;
+    },
+    tx: NodePgDatabase<typeof schema> = this.db,
+  ) {
+    const [user] = await tx
       .insert(schema.users)
       .values({
         clerkUserId: data.clerkUserId,
@@ -53,12 +56,12 @@ export class UsersService {
           address: data.address,
           avatarUrl: data.avatarUrl
             ? sql`
-                CASE
-                  WHEN ${schema.users.avatarUrl} IS NULL THEN ${data.avatarUrl}
-                  WHEN ${schema.users.avatarUrl} LIKE '%clerk.com%' THEN ${data.avatarUrl}
-                  ELSE ${schema.users.avatarUrl}
-                END
-              `
+              CASE
+                WHEN ${schema.users.avatarUrl} IS NULL THEN ${data.avatarUrl}
+                WHEN ${schema.users.avatarUrl} LIKE '%clerk.com%' THEN ${data.avatarUrl}
+                ELSE ${schema.users.avatarUrl}
+              END
+            `
             : sql`${schema.users.avatarUrl}`,
         },
       })

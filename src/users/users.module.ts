@@ -1,10 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { WebhooksController } from './webhooks.controller';
+import { StudentsModule } from '@/students/students.module';
 
+@Global()
 @Module({
-  imports: [],
+  imports: [StudentsModule],
   controllers: [UsersController, WebhooksController],
   providers: [UsersService],
   exports: [UsersService],

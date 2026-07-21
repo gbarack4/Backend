@@ -13,6 +13,7 @@ export class PublicWebsitesService {
   async findByDomain(domain: string): Promise<WebsiteConfigDto | null> {
     const [record] = await this.db
       .select({
+        schoolId: schema.schools.id,
         schoolName: schema.schools.name,
         templateName: schema.websiteTemplates.name,
         baseConfig: schema.websiteTemplates.config,
@@ -50,6 +51,7 @@ export class PublicWebsitesService {
     };
 
     return {
+      schoolId: record.schoolId,
       schoolName: record.schoolName,
       templateName: record.templateName,
       config: mergedConfig,
