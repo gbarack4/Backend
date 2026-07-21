@@ -48,11 +48,11 @@ export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
 
   constructor(
+    @Inject(DB_CONNECTION)
+    private readonly db: NodePgDatabase<typeof schema>,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
     private readonly studentsService: StudentsService,
-    @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   @Post()
