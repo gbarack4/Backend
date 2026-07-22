@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DB_CONNECTION } from '@/database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as schema from '@/database/schema';
 
 @Injectable()
@@ -63,6 +63,42 @@ export class StudentsService {
         },
       })
       .returning();
+
+    return student;
+  }
+
+  async getStudentByUserIdAndSchool(userId: string, schoolId: string) {
+    const [student] = await this.db
+      .select({
+        id: schema.students.id,
+        schoolId: schema.students.schoolId,
+        name: schema.students.name,
+        email: schema.students.email,
+        phone: schema.students.phone,
+        createdAt: schema.students.createdAt,
+        user: {
+          id: schema.users.id,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          phoneNumber: schema.users.phoneNumber,
+          avatarUrl: schema.users.avatarUrl,
+          address: schema.users.address,
+        },
+      })
+      .from(schema.students)
+      .innerJoin(schema.users, eq(schema.students.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.students.userId, userId),
+          eq(schema.students.schoolId, schoolId),
+        ),
+      )
+      .limit(1);
+
+    if (!student) {
+      throw new NotFoundException('Student record not found for this school');
+    }
 
     return student;
   }

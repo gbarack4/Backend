@@ -64,8 +64,6 @@ export class SchoolsUploadController {
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
     @Headers('x-school-id') schoolId: string,
   ) {
-    // `schoolId` presence, school membership, and the granular edit permission
-    // are already validated by SchoolRolesGuard before this handler runs.
     return this.s3Service.uploadSchoolFile(
       schoolId,
       file,
