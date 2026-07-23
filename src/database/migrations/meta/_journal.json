@@ -162,6 +162,13 @@
       "when": 1784837532664,
       "tag": "0022_wandering_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784838476329,
+      "tag": "0023_noisy_northstar",
+      "breakpoints": true
     }
   ]
 }
