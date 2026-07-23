@@ -955,4 +955,5 @@ export const instructorOnboardingDrafts = pgTable(
 export const testTable = pgTable('test_table', {
   id: uuid().defaultRandom().primaryKey().notNull(),
   name: text('name'),
+  status: text().default('active').notNull(),
 });

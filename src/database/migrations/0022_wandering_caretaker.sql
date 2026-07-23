@@ -1,0 +1,1 @@
+ALTER TABLE "test_table" ADD COLUMN "status" text DEFAULT 'active' NOT NULL;
