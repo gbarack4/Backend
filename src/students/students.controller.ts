@@ -14,6 +14,7 @@ import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import type { UserEntity } from '@/auth/interfaces/auth.interface';
 import { SyncStudentDto } from './dto/sync-student.dto';
 import { UpdateStudentAvatarDto } from './dto/update-student-avatar.dto';
+import { UpdateStudentPersonalInfoDto } from './dto/update-student-personal-info.dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('students')
@@ -69,5 +70,24 @@ export class StudentsController {
       schoolId,
       dto.avatarUrl,
     );
+  }
+
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @Patch('school/:schoolId/me/personal-info')
+  @ApiOperation({
+    summary:
+      'Update current student personal information for a specific school',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student personal information updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Student record not found' })
+  async updateMyPersonalInfo(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId') schoolId: string,
+    @Body() dto: UpdateStudentPersonalInfoDto,
+  ) {
+    return this.studentsService.updatePersonalInfo(user.id, schoolId, dto);
   }
 }

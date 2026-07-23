@@ -92,8 +92,49 @@ export class StudentsService {
     return student;
   }
 
-  async getStudentByUserIdAndSchool(userId: string, schoolId: string) {
-    const [student] = await this.db
+  async updatePersonalInfo(
+    userId: string,
+    schoolId: string,
+    data: {
+      fullName: string;
+      phone: string | null;
+      address: string | null;
+    },
+  ) {
+    return this.db.transaction(async (tx) => {
+      const [student] = await tx
+        .update(schema.students)
+        .set({
+          name: data.fullName,
+          phone: data.phone,
+        })
+        .where(
+          and(
+            eq(schema.students.userId, userId),
+            eq(schema.students.schoolId, schoolId),
+          ),
+        )
+        .returning();
+
+      if (!student) {
+        throw new NotFoundException('Student record not found for this school');
+      }
+
+      await tx
+        .update(schema.users)
+        .set({ address: data.address })
+        .where(eq(schema.users.id, userId));
+
+      return this.getStudentByUserIdAndSchool(userId, schoolId, tx);
+    });
+  }
+
+  async getStudentByUserIdAndSchool(
+    userId: string,
+    schoolId: string,
+    tx: NodePgDatabase<typeof schema> = this.db,
+  ) {
+    const [student] = await tx
       .select({
         id: schema.students.id,
         schoolId: schema.students.schoolId,
