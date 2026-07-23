@@ -1,10 +1,19 @@
-import { Controller, Post, Body, UseGuards, Get, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Body,
+  UseGuards,
+  Get,
+  Param,
+} from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import type { UserEntity } from '@/auth/interfaces/auth.interface';
 import { SyncStudentDto } from './dto/sync-student.dto';
+import { UpdateStudentAvatarDto } from './dto/update-student-avatar.dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('students')
@@ -38,5 +47,27 @@ export class StudentsController {
     @Param('schoolId') schoolId: string,
   ) {
     return this.studentsService.getStudentByUserIdAndSchool(user.id, schoolId);
+  }
+
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @Patch('school/:schoolId/me/avatar')
+  @ApiOperation({
+    summary: 'Update current student avatar for a specific school',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student avatar updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Student record not found' })
+  async updateMyAvatar(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId') schoolId: string,
+    @Body() dto: UpdateStudentAvatarDto,
+  ) {
+    return this.studentsService.updateAvatarUrl(
+      user.id,
+      schoolId,
+      dto.avatarUrl,
+    );
   }
 }

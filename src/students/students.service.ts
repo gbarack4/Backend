@@ -42,6 +42,7 @@ export class StudentsService {
       name: string;
       email?: string | null;
       phone?: string | null;
+      avatarUrl?: string | null;
     },
     tx: NodePgDatabase<typeof schema> = this.db,
   ) {
@@ -53,6 +54,7 @@ export class StudentsService {
         name: data.name,
         email: data.email,
         phone: data.phone,
+        avatarUrl: data.avatarUrl,
       })
       .onConflictDoUpdate({
         target: [schema.students.schoolId, schema.students.userId],
@@ -67,6 +69,29 @@ export class StudentsService {
     return student;
   }
 
+  async updateAvatarUrl(
+    userId: string,
+    schoolId: string,
+    avatarUrl: string | null,
+  ) {
+    const [student] = await this.db
+      .update(schema.students)
+      .set({ avatarUrl })
+      .where(
+        and(
+          eq(schema.students.userId, userId),
+          eq(schema.students.schoolId, schoolId),
+        ),
+      )
+      .returning();
+
+    if (!student) {
+      throw new NotFoundException('Student record not found for this school');
+    }
+
+    return student;
+  }
+
   async getStudentByUserIdAndSchool(userId: string, schoolId: string) {
     const [student] = await this.db
       .select({
@@ -75,6 +100,7 @@ export class StudentsService {
         name: schema.students.name,
         email: schema.students.email,
         phone: schema.students.phone,
+        avatarUrl: schema.students.avatarUrl,
         createdAt: schema.students.createdAt,
         user: {
           id: schema.users.id,

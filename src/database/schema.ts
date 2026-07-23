@@ -253,6 +253,7 @@ export const students = pgTable(
     name: text().notNull(),
     email: text(),
     phone: text(),
+    avatarUrl: text('avatar_url'),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
