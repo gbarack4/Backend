@@ -27,7 +27,7 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredRoles || requiredRoles.length === 0) {
+    if (!requiredRoles?.length) {
       return true;
     }
 
@@ -38,49 +38,11 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User profile not found');
     }
 
-    let hasAccess = false;
-
-    for (const role of requiredRoles) {
-      if (role === 'instructor') {
-        const instructorRecord = await this.db
-          .select({ id: schema.instructors.id })
-          .from(schema.instructors)
-          .where(eq(schema.instructors.userId, user.id))
-          .limit(1);
-
-        if (instructorRecord.length > 0) {
-          hasAccess = true;
-          request.instructorId = instructorRecord[0].id;
-          break;
-        }
-      }
-
-      if (role === 'student') {
-        const studentRecord = await this.db
-          .select({ id: schema.students.id })
-          .from(schema.students)
-          .where(eq(schema.students.userId, user.id))
-          .limit(1);
-
-        if (studentRecord.length > 0) {
-          hasAccess = true;
-          break;
-        }
-      }
-
-      if (['owner', 'admin', 'staff'].includes(role)) {
-        const schoolUserRecord = await this.db
-          .select({ id: schema.schoolUsers.id })
-          .from(schema.schoolUsers)
-          .where(eq(schema.schoolUsers.userId, user.id))
-          .limit(1);
-
-        if (schoolUserRecord.length > 0) {
-          hasAccess = true;
-          break;
-        }
-      }
-    }
+    const hasAccess = await this.checkUserRoles(
+      requiredRoles,
+      user.id,
+      request,
+    );
 
     if (!hasAccess) {
       throw new ForbiddenException(
@@ -89,5 +51,60 @@ export class RolesGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  private async checkUserRoles(
+    roles: string[],
+    userId: string,
+    request: RequestWithAuth,
+  ): Promise<boolean> {
+    for (const role of roles) {
+      if (role === 'instructor' && (await this.isInstructor(userId, request)))
+        return true;
+      if (role === 'student' && (await this.isStudent(userId))) return true;
+      if (
+        ['owner', 'admin', 'staff'].includes(role) &&
+        (await this.isStaff(userId))
+      )
+        return true;
+    }
+    return false;
+  }
+
+  private async isInstructor(
+    userId: string,
+    request: RequestWithAuth,
+  ): Promise<boolean> {
+    const record = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId))
+      .limit(1);
+
+    if (record.length > 0) {
+      request.instructorId = record[0].id;
+      return true;
+    }
+    return false;
+  }
+
+  private async isStudent(userId: string): Promise<boolean> {
+    const record = await this.db
+      .select({ id: schema.students.id })
+      .from(schema.students)
+      .where(eq(schema.students.userId, userId))
+      .limit(1);
+
+    return record.length > 0;
+  }
+
+  private async isStaff(userId: string): Promise<boolean> {
+    const record = await this.db
+      .select({ id: schema.schoolUsers.id })
+      .from(schema.schoolUsers)
+      .where(eq(schema.schoolUsers.userId, userId))
+      .limit(1);
+
+    return record.length > 0;
   }
 }
