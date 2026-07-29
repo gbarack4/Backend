@@ -169,6 +169,13 @@
       "when": 1784838476329,
       "tag": "0023_noisy_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785357150300,
+      "tag": "0024_add_location_coordinates",
+      "breakpoints": true
     }
   ]
 }

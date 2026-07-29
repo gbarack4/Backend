@@ -14,6 +14,7 @@ import {
   boolean,
   jsonb,
   date,
+  geometry,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -72,6 +73,12 @@ export const locations = pgTable(
     suburb: text('suburb'),
     state: text('state'),
     postcode: text('postcode'),
+    coordinates: geometry('coordinates', {
+      type: 'point',
+      mode: 'xy',
+      srid: 4326,
+    }),
+    googlePlaceId: text('google_place_id'),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -89,6 +96,7 @@ export const locations = pgTable(
       to: ['public'],
       using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
     }),
+    index('idx_locations_coordinates').using('gist', table.coordinates),
   ],
 );
 
