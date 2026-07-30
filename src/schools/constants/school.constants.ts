@@ -28,3 +28,5 @@ export const APP_DOMAIN_SUFFIX = 'driveinstructor.pro';
 export const DEFAULT_TEMPLATE_NAME = 'Default Theme';
 export const TRIAL_DURATION_DAYS = 14;
 export const MAX_SLUG_ATTEMPTS = 10;
+
+export const DEFAULT_SEARCH_RADIUS_METERS = 10_000;

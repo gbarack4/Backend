@@ -7,6 +7,7 @@ import {
   Patch,
   Headers,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { SchoolsService } from './schools.service';
 import { SetupSchoolDto } from './dto/setup-school.dto';
@@ -26,13 +27,18 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { SchoolSearchService } from './school-search.service';
+import { SearchSchoolsDto } from './dto/search-schools.dto';
 
 @ApiTags('Schools Management')
 @ApiBearerAuth()
 @Controller('schools')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
 export class SchoolsController {
-  constructor(private readonly schoolsService: SchoolsService) {}
+  constructor(
+    private readonly schoolsService: SchoolsService,
+    private readonly schoolSearchService: SchoolSearchService,
+  ) {}
 
   @Post('setup')
   @ApiOperation({ summary: 'Setup and initialize a new driving school' })
@@ -145,5 +151,15 @@ export class SchoolsController {
       schoolId,
       dto.coverImageUrl,
     );
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search for driving schools (Instructor Portal)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns an array of schools matching the search criteria',
+  })
+  async search(@Query() query: SearchSchoolsDto) {
+    return this.schoolSearchService.searchSchools(query);
   }
 }

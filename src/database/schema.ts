@@ -90,13 +90,13 @@ export const locations = pgTable(
       foreignColumns: [schools.id],
       name: 'locations_school_id_fkey',
     }).onDelete('cascade'),
+    index('idx_locations_coordinates').using('gist', table.coordinates),
     pgPolicy('isolate_locations', {
       as: 'permissive',
       for: 'all',
       to: ['public'],
       using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
     }),
-    index('idx_locations_coordinates').using('gist', table.coordinates),
   ],
 );
 
@@ -108,7 +108,7 @@ export const schools = pgTable(
     name: text().notNull(),
     email: text('email'),
     phone: text('phone'),
-    category: text('category'),
+    category: text('category').notNull(),
     description: text('description'),
     coverImageUrl: text('cover_image_url'),
     logoUrl: text('logo_url'),
@@ -148,6 +148,7 @@ export const schools = pgTable(
     }).onDelete('restrict'),
 
     unique('schools_slug_key').on(table.slug),
+    index('idx_schools_name_trgm').using('gin', table.name.op('gin_trgm_ops')),
     check(
       'schools_status_check',
       sql`status = ANY (ARRAY['onboarding'::text, 'active'::text, 'suspended'::text])`,
