@@ -37,6 +37,7 @@ export class SearchSchoolsDto {
   originLng?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   radiusKm?: number;
 

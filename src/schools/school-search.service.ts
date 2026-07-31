@@ -100,7 +100,7 @@ export class SchoolSearchService {
           logoUrl: schema.schools.logoUrl,
           coverImageUrl: schema.schools.coverImageUrl,
           about: schema.schools.description,
-          address: schema.locations.address,
+          address: schema.locations.addressLine1,
           suburb: schema.locations.suburb,
           postcode: schema.locations.postcode,
           longitude: sql<

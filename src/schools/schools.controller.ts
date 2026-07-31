@@ -8,6 +8,7 @@ import {
   Headers,
   NotFoundException,
   Query,
+  Param,
 } from '@nestjs/common';
 import { SchoolsService } from './schools.service';
 import { SetupSchoolDto } from './dto/setup-school.dto';
@@ -29,6 +30,9 @@ import {
 } from '@nestjs/swagger';
 import { SchoolSearchService } from './school-search.service';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
+import { SchoolSetupService } from './school-setup.service';
+import { SchoolSettingsService } from './school-settings.service';
+import { SchoolMediaService } from './school-media.service';
 
 @ApiTags('Schools Management')
 @ApiBearerAuth()
@@ -37,6 +41,9 @@ import { SearchSchoolsDto } from './dto/search-schools.dto';
 export class SchoolsController {
   constructor(
     private readonly schoolsService: SchoolsService,
+    private readonly schoolSetupService: SchoolSetupService,
+    private readonly schoolSettingsService: SchoolSettingsService,
+    private readonly schoolMediaService: SchoolMediaService,
     private readonly schoolSearchService: SchoolSearchService,
   ) {}
 
@@ -47,7 +54,7 @@ export class SchoolsController {
     description: 'School successfully created and initialized',
   })
   async setup(@CurrentUser() user: UserEntity, @Body() dto: SetupSchoolDto) {
-    return this.schoolsService.setupNewSchool(user.id, dto);
+    return this.schoolSetupService.setupNewSchool(user.id, dto);
   }
 
   @Get('default')
@@ -82,7 +89,7 @@ export class SchoolsController {
     description: 'Returns school configuration payload',
   })
   async getSettings(@Headers('x-school-id') schoolId: string) {
-    return this.schoolsService.getSchoolSettings(schoolId);
+    return this.schoolSettingsService.getSchoolSettings(schoolId);
   }
 
   @Patch('settings')
@@ -105,7 +112,7 @@ export class SchoolsController {
     @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolSettingsDto,
   ) {
-    return this.schoolsService.updateSchoolSettings(schoolId, dto);
+    return this.schoolSettingsService.updateSchoolSettings(schoolId, dto);
   }
 
   @Patch('logo')
@@ -126,7 +133,7 @@ export class SchoolsController {
     @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolLogoDto,
   ) {
-    return this.schoolsService.updateSchoolLogo(schoolId, dto.logoUrl);
+    return this.schoolMediaService.updateSchoolLogo(schoolId, dto.logoUrl);
   }
 
   @Patch('cover')
@@ -147,7 +154,7 @@ export class SchoolsController {
     @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolCoverImageDto,
   ) {
-    return this.schoolsService.updateSchoolCoverImage(
+    return this.schoolMediaService.updateSchoolCoverImage(
       schoolId,
       dto.coverImageUrl,
     );
@@ -161,5 +168,13 @@ export class SchoolsController {
   })
   async search(@Query() query: SearchSchoolsDto) {
     return this.schoolSearchService.searchSchools(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a driving school by its unique identifier' })
+  @ApiResponse({ status: 200, description: 'Returns school entity' })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  async getSchoolById(@Param('id') id: string) {
+    return this.schoolsService.getSchoolById(id);
   }
 }
