@@ -106,7 +106,7 @@ export class SchoolsService {
     const totalRating = reviews.reduce((acc, r) => acc + r.rating, 0);
     const rating = reviewCount > 0 ? totalRating / reviewCount : 0;
 
-    const coords = location?.coordinates as
+    const coords = location?.publicCoordinates as
       | { x: number; y: number }
       | undefined;
 
@@ -117,7 +117,7 @@ export class SchoolsService {
       logoUrl: school.logoUrl,
       coverImageUrl: school.coverImageUrl,
       about: school.description,
-      address: location?.addressLine1 || null,
+      address: location?.publicAddressLine1 || null,
       suburb: location?.suburb || null,
       postcode: location?.postcode || null,
       longitude: coords?.x || null,

@@ -36,7 +36,7 @@ export class SchoolSearchService {
     if (hasBboxFilter) {
       conditions.push(
         sql`ST_Within(
-          ${schema.locations.coordinates}::geometry,
+          ${schema.locations.publicCoordinates}::geometry,
           ST_MakeEnvelope(${query.minLng}, ${query.minLat}, ${query.maxLng}, ${query.maxLat}, 4326)
         )`,
       );
@@ -52,7 +52,7 @@ export class SchoolSearchService {
         : DEFAULT_SEARCH_RADIUS_METERS;
       conditions.push(
         sql`ST_DWithin(
-          ${schema.locations.coordinates}::geography,
+          ${schema.locations.publicCoordinates}::geography,
           ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography,
           ${radiusMeters}
         )`,
@@ -62,7 +62,7 @@ export class SchoolSearchService {
     const sortingExpression =
       query.originLat !== undefined && query.originLng !== undefined
         ? sql`ST_Distance(
-            ${schema.locations.coordinates}::geography,
+            ${schema.locations.publicCoordinates}::geography,
             ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography
           ) ASC`
         : sql`${schema.schools.name} ASC`;
@@ -100,19 +100,21 @@ export class SchoolSearchService {
           logoUrl: schema.schools.logoUrl,
           coverImageUrl: schema.schools.coverImageUrl,
           about: schema.schools.description,
-          address: schema.locations.addressLine1,
+          address: schema.locations.publicAddressLine1,
+
           suburb: schema.locations.suburb,
           postcode: schema.locations.postcode,
           longitude: sql<
             number | null
-          >`ST_X(${schema.locations.coordinates}::geometry)`,
+          >`ST_X(${schema.locations.publicCoordinates}::geometry)`,
           latitude: sql<
             number | null
-          >`ST_Y(${schema.locations.coordinates}::geometry)`,
+          >`ST_Y(${schema.locations.publicCoordinates}::geometry)`,
+
           distance:
             query.originLat !== undefined && query.originLng !== undefined
               ? sql<number | null>`CAST(ST_Distance(
-                  ${schema.locations.coordinates}::geography,
+                  ${schema.locations.publicCoordinates}::geography,
                   ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography
                 ) / 1000 AS FLOAT)`
               : sql<null>`NULL`,

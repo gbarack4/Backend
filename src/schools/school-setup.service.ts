@@ -19,6 +19,7 @@ import {
   MAX_SLUG_ATTEMPTS,
 } from './constants/school.constants';
 import { GeocodingService } from '@/location/geocoding.service';
+import { stripStreetNumber } from '@/common/utils/address.util';
 
 function isPostgresError(
   error: unknown,
@@ -63,7 +64,7 @@ export class SchoolSetupService {
 
   async setupNewSchool(userId: string, dto: SetupSchoolDto) {
     const slug = await this.generateUniqueSlug(dto.name);
-
+    const publicAddressLine1 = stripStreetNumber(dto.addressLine1);
     const fullAddress = [
       dto.addressLine1,
       dto.addressLine2,
@@ -75,17 +76,42 @@ export class SchoolSetupService {
       .filter(Boolean)
       .join(', ');
 
-    const geoResult = await this.geocodingService.getCoordinatesFromAddress(
-      fullAddress,
-      'au',
-    );
+    const publicAddressForGeo = [
+      publicAddressLine1,
+      dto.suburb,
+      dto.state,
+      dto.postcode,
+      'Australia',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const [geoResult, publicGeoResult] = await Promise.all([
+      this.geocodingService.getCoordinatesFromAddress(fullAddress, 'au'),
+      this.geocodingService.getCoordinatesFromAddress(
+        publicAddressForGeo,
+        'au',
+      ),
+    ]);
 
     if (geoResult.status === 'error') {
       this.logger.warn(
-        `Geocoding failed for user ${userId}, proceeding without coordinates: ${geoResult.message}`,
+        `Geocoding failed for user ${userId}, proceeding without exact coordinates: ${geoResult.message}`,
       );
     } else if (geoResult.status === 'not_found') {
-      this.logger.warn(`Address not found for user ${userId}: ${fullAddress}`);
+      this.logger.warn(
+        `Exact address not found for user ${userId}: ${fullAddress}`,
+      );
+    }
+
+    if (publicGeoResult.status === 'error') {
+      this.logger.warn(
+        `Public geocoding failed for user ${userId}, proceeding without public coordinates: ${publicGeoResult.message}`,
+      );
+    } else if (publicGeoResult.status === 'not_found') {
+      this.logger.warn(
+        `Public address not found for user ${userId}: ${publicAddressForGeo}`,
+      );
     }
 
     try {
@@ -146,6 +172,11 @@ export class SchoolSetupService {
               ? sql`ST_SetSRID(ST_MakePoint(${geoResult.lng}, ${geoResult.lat}), 4326)`
               : null,
           googlePlaceId: null,
+          publicAddressLine1: publicAddressLine1,
+          publicCoordinates:
+            publicGeoResult.status === 'found'
+              ? sql`ST_SetSRID(ST_MakePoint(${publicGeoResult.lng}, ${publicGeoResult.lat}), 4326)`
+              : null,
         });
 
         await tx.insert(schema.schoolWebsites).values({
