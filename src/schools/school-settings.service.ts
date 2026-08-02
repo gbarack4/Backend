@@ -111,20 +111,11 @@ export class SchoolSettingsService {
         throw new NotFoundException('School not found');
       }
 
-      const hasAddressUpdate = this.hasAddressFields(dto);
-      const geoResult = hasAddressUpdate
-        ? await this.resolveGeocodeResult(schoolId, dto)
-        : null;
+      const geoResult = await this.resolveGeocodeResult(schoolId, dto);
 
       await this.db.transaction(async (tx) => {
         await this.applySchoolUpdates(tx, school, dto);
-        await this.applyLocationUpdates(
-          tx,
-          school.id,
-          dto,
-          geoResult,
-          hasAddressUpdate,
-        );
+        await this.applyLocationUpdates(tx, school.id, dto, geoResult);
       });
 
       return { success: true, message: 'Settings updated successfully' };
@@ -133,28 +124,16 @@ export class SchoolSettingsService {
     }
   }
 
-  private hasAddressFields(dto: UpdateSchoolSettingsDto): boolean {
-    return (
-      dto.addressLine1 !== undefined ||
-      dto.addressLine2 !== undefined ||
-      dto.suburb !== undefined ||
-      dto.state !== undefined ||
-      dto.postcode !== undefined
-    );
-  }
-
   private async resolveGeocodeResult(
     schoolId: string,
     dto: UpdateSchoolSettingsDto,
   ): Promise<GeocodeResult> {
-    const currentLocation = await this.getCurrentLocation(schoolId);
-
     const fullAddress = [
-      dto.addressLine1 ?? currentLocation?.addressLine1,
-      dto.addressLine2 ?? currentLocation?.addressLine2,
-      dto.suburb ?? currentLocation?.suburb,
-      dto.state ?? currentLocation?.state,
-      dto.postcode ?? currentLocation?.postcode,
+      dto.addressLine1,
+      dto.addressLine2,
+      dto.suburb,
+      dto.state,
+      dto.postcode,
       'Australia',
     ]
       .filter(Boolean)
@@ -168,22 +147,6 @@ export class SchoolSettingsService {
     this.logGeocodeOutcome(schoolId, fullAddress, geoResult);
 
     return geoResult;
-  }
-
-  private async getCurrentLocation(schoolId: string) {
-    const [location] = await this.db
-      .select({
-        addressLine1: schema.locations.addressLine1,
-        addressLine2: schema.locations.addressLine2,
-        suburb: schema.locations.suburb,
-        state: schema.locations.state,
-        postcode: schema.locations.postcode,
-      })
-      .from(schema.locations)
-      .where(eq(schema.locations.schoolId, schoolId))
-      .limit(1);
-
-    return location;
   }
 
   private logGeocodeOutcome(
@@ -257,8 +220,7 @@ export class SchoolSettingsService {
 
   private buildLocationUpdates(
     dto: UpdateSchoolSettingsDto,
-    geoResult: GeocodeResult | null,
-    hasAddressUpdate: boolean,
+    geoResult: GeocodeResult,
   ) {
     const updates: Record<string, string | SQL | null> = {};
 
@@ -268,12 +230,10 @@ export class SchoolSettingsService {
     if (dto.state !== undefined) updates.state = dto.state;
     if (dto.postcode !== undefined) updates.postcode = dto.postcode;
 
-    if (hasAddressUpdate) {
-      if (geoResult?.status === 'found') {
-        updates.coordinates = sql`ST_SetSRID(ST_MakePoint(${geoResult.lng}, ${geoResult.lat}), 4326)`;
-      } else if (geoResult?.status === 'not_found') {
-        updates.coordinates = null;
-      }
+    if (geoResult.status === 'found') {
+      updates.coordinates = sql`ST_SetSRID(ST_MakePoint(${geoResult.lng}, ${geoResult.lat}), 4326)`;
+    } else if (geoResult.status === 'not_found') {
+      updates.coordinates = null;
     }
 
     return updates;
@@ -310,10 +270,9 @@ export class SchoolSettingsService {
     tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
     schoolId: string,
     dto: UpdateSchoolSettingsDto,
-    geoResult: GeocodeResult | null,
-    hasAddressUpdate: boolean,
+    geoResult: GeocodeResult,
   ): Promise<void> {
-    const updates = this.buildLocationUpdates(dto, geoResult, hasAddressUpdate);
+    const updates = this.buildLocationUpdates(dto, geoResult);
 
     if (Object.keys(updates).length > 0) {
       await tx
