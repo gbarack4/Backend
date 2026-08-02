@@ -79,6 +79,11 @@ export const locations = pgTable(
       srid: 4326,
     }),
     googlePlaceId: text('google_place_id'),
+    publicAddressLine1: text('public_address_line_1'),
+    publicCoordinates: geometry('public_coordinates', {
+      type: 'Point',
+      srid: 4326,
+    }),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
