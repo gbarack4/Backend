@@ -8,7 +8,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import slugify from 'slugify';
 import * as schema from '../database/schema';
 import { SetupSchoolDto } from './dto/setup-school.dto';
@@ -18,6 +18,7 @@ import {
   TRIAL_DURATION_DAYS,
   MAX_SLUG_ATTEMPTS,
 } from './constants/school.constants';
+import { GeocodingService } from '@/location/geocoding.service';
 
 function isPostgresError(
   error: unknown,
@@ -31,6 +32,7 @@ export class SchoolSetupService {
 
   constructor(
     @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   private async generateUniqueSlug(name: string): Promise<string> {
@@ -60,9 +62,31 @@ export class SchoolSetupService {
   }
 
   async setupNewSchool(userId: string, dto: SetupSchoolDto) {
-    this.logger.log(`Setting up school for user ${userId}`);
-
     const slug = await this.generateUniqueSlug(dto.name);
+
+    const fullAddress = [
+      dto.addressLine1,
+      dto.addressLine2,
+      dto.suburb,
+      dto.state,
+      dto.postcode,
+      'Australia',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const geoResult = await this.geocodingService.getCoordinatesFromAddress(
+      fullAddress,
+      'au',
+    );
+
+    if (geoResult.status === 'error') {
+      this.logger.warn(
+        `Geocoding failed for user ${userId}, proceeding without coordinates: ${geoResult.message}`,
+      );
+    } else if (geoResult.status === 'not_found') {
+      this.logger.warn(`Address not found for user ${userId}: ${fullAddress}`);
+    }
 
     try {
       return await this.db.transaction(async (tx) => {
@@ -117,6 +141,11 @@ export class SchoolSetupService {
           suburb: dto.suburb,
           state: dto.state,
           postcode: dto.postcode,
+          coordinates:
+            geoResult.status === 'found'
+              ? sql`ST_SetSRID(ST_MakePoint(${geoResult.lng}, ${geoResult.lat}), 4326)`
+              : null,
+          googlePlaceId: null,
         });
 
         await tx.insert(schema.schoolWebsites).values({

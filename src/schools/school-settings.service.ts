@@ -8,11 +8,13 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, SQL, sql } from 'drizzle-orm';
 import slugify from 'slugify';
 import * as schema from '../database/schema';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { APP_DOMAIN_SUFFIX } from './constants/school.constants';
+import { GeocodingService } from '@/location/geocoding.service';
+import { GeocodeResult } from '@/location/types/geocoding.types';
 
 function isPostgresError(
   error: unknown,
@@ -26,6 +28,7 @@ export class SchoolSettingsService {
 
   constructor(
     @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   async getSchoolSettings(schoolId: string) {
@@ -108,34 +111,120 @@ export class SchoolSettingsService {
         throw new NotFoundException('School not found');
       }
 
+      const hasAddressUpdate = this.hasAddressFields(dto);
+      const geoResult = hasAddressUpdate
+        ? await this.resolveGeocodeResult(schoolId, dto)
+        : null;
+
       await this.db.transaction(async (tx) => {
         await this.applySchoolUpdates(tx, school, dto);
-        await this.applyLocationUpdates(tx, school.id, dto);
+        await this.applyLocationUpdates(
+          tx,
+          school.id,
+          dto,
+          geoResult,
+          hasAddressUpdate,
+        );
       });
 
       return { success: true, message: 'Settings updated successfully' };
     } catch (error: unknown) {
-      if (isPostgresError(error) && error.code === '23505') {
-        if (
-          error.constraint === 'schools_slug_key' ||
-          error.constraint === 'school_domains_domain_key'
-        ) {
-          throw new ConflictException(
-            'This domain prefix is already taken. Please choose another one.',
-          );
-        }
-      }
+      throw this.mapUpdateError(schoolId, error);
+    }
+  }
 
-      if (error instanceof HttpException) throw error;
+  private hasAddressFields(dto: UpdateSchoolSettingsDto): boolean {
+    return (
+      dto.addressLine1 !== undefined ||
+      dto.addressLine2 !== undefined ||
+      dto.suburb !== undefined ||
+      dto.state !== undefined ||
+      dto.postcode !== undefined
+    );
+  }
 
-      this.logger.error(
-        `Failed to update settings for school ${schoolId}`,
-        error instanceof Error ? error.stack : 'Unknown error',
+  private async resolveGeocodeResult(
+    schoolId: string,
+    dto: UpdateSchoolSettingsDto,
+  ): Promise<GeocodeResult> {
+    const currentLocation = await this.getCurrentLocation(schoolId);
+
+    const fullAddress = [
+      dto.addressLine1 ?? currentLocation?.addressLine1,
+      dto.addressLine2 ?? currentLocation?.addressLine2,
+      dto.suburb ?? currentLocation?.suburb,
+      dto.state ?? currentLocation?.state,
+      dto.postcode ?? currentLocation?.postcode,
+      'Australia',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const geoResult = await this.geocodingService.getCoordinatesFromAddress(
+      fullAddress,
+      'au',
+    );
+
+    this.logGeocodeOutcome(schoolId, fullAddress, geoResult);
+
+    return geoResult;
+  }
+
+  private async getCurrentLocation(schoolId: string) {
+    const [location] = await this.db
+      .select({
+        addressLine1: schema.locations.addressLine1,
+        addressLine2: schema.locations.addressLine2,
+        suburb: schema.locations.suburb,
+        state: schema.locations.state,
+        postcode: schema.locations.postcode,
+      })
+      .from(schema.locations)
+      .where(eq(schema.locations.schoolId, schoolId))
+      .limit(1);
+
+    return location;
+  }
+
+  private logGeocodeOutcome(
+    schoolId: string,
+    fullAddress: string,
+    geoResult: GeocodeResult,
+  ): void {
+    if (geoResult.status === 'error') {
+      this.logger.warn(
+        `Geocoding failed for school ${schoolId} update: ${geoResult.message}`,
       );
-      throw new InternalServerErrorException(
-        'Could not update school settings',
+      return;
+    }
+
+    if (geoResult.status === 'not_found') {
+      this.logger.warn(
+        `Address not found for school ${schoolId} update: ${fullAddress}`,
       );
     }
+  }
+
+  private mapUpdateError(schoolId: string, error: unknown): HttpException {
+    if (isPostgresError(error) && error.code === '23505') {
+      const conflictConstraints = [
+        'schools_slug_key',
+        'school_domains_domain_key',
+      ];
+      if (error.constraint && conflictConstraints.includes(error.constraint)) {
+        return new ConflictException(
+          'This domain prefix is already taken. Please choose another one.',
+        );
+      }
+    }
+
+    if (error instanceof HttpException) return error;
+
+    this.logger.error(
+      `Failed to update settings for school ${schoolId}`,
+      error instanceof Error ? error.stack : 'Unknown error',
+    );
+    return new InternalServerErrorException('Could not update school settings');
   }
 
   private buildSchoolUpdates(
@@ -168,14 +257,24 @@ export class SchoolSettingsService {
 
   private buildLocationUpdates(
     dto: UpdateSchoolSettingsDto,
-  ): Partial<typeof schema.locations.$inferInsert> {
-    const updates: Partial<typeof schema.locations.$inferInsert> = {};
+    geoResult: GeocodeResult | null,
+    hasAddressUpdate: boolean,
+  ) {
+    const updates: Record<string, string | SQL | null> = {};
 
     if (dto.addressLine1 !== undefined) updates.addressLine1 = dto.addressLine1;
     if (dto.addressLine2 !== undefined) updates.addressLine2 = dto.addressLine2;
     if (dto.suburb !== undefined) updates.suburb = dto.suburb;
     if (dto.state !== undefined) updates.state = dto.state;
     if (dto.postcode !== undefined) updates.postcode = dto.postcode;
+
+    if (hasAddressUpdate) {
+      if (geoResult?.status === 'found') {
+        updates.coordinates = sql`ST_SetSRID(ST_MakePoint(${geoResult.lng}, ${geoResult.lat}), 4326)`;
+      } else if (geoResult?.status === 'not_found') {
+        updates.coordinates = null;
+      }
+    }
 
     return updates;
   }
@@ -211,8 +310,10 @@ export class SchoolSettingsService {
     tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
     schoolId: string,
     dto: UpdateSchoolSettingsDto,
+    geoResult: GeocodeResult | null,
+    hasAddressUpdate: boolean,
   ): Promise<void> {
-    const updates = this.buildLocationUpdates(dto);
+    const updates = this.buildLocationUpdates(dto, geoResult, hasAddressUpdate);
 
     if (Object.keys(updates).length > 0) {
       await tx

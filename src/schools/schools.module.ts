@@ -8,9 +8,10 @@ import { SchoolSearchService } from './school-search.service';
 import { SchoolSetupService } from './school-setup.service';
 import { SchoolSettingsService } from './school-settings.service';
 import { SchoolMediaService } from './school-media.service';
+import { LocationModule } from '@/location/geocoding.module';
 
 @Module({
-  imports: [DatabaseModule, UsersModule],
+  imports: [DatabaseModule, UsersModule, LocationModule],
   controllers: [SchoolsController, SchoolsUploadController],
   providers: [
     SchoolsService,

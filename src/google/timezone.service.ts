@@ -39,6 +39,9 @@ export class TimezoneService {
     const geoData = (await geoRes.json()) as GoogleGeocodeResponse;
 
     if (geoData.status !== 'OK' || !geoData.results[0]) {
+      this.logger.error(
+        `Geocoding failed for "${address}": status=${geoData.status}, message=${geoData.error_message ?? 'n/a'}`,
+      );
       throw new BadRequestException('Could not resolve location from address');
     }
 

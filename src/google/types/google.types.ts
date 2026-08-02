@@ -40,9 +40,11 @@ export interface GoogleGeocodeResponse {
       types: string[];
     }[];
   }[];
+  error_message?: string;
 }
 
 export interface GoogleTimezoneResponse {
   status: string;
   timeZoneId: string;
+  error_message?: string;
 }

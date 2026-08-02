@@ -8,6 +8,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import { DB_CONNECTION } from '@/database/database.module';
+import { TrimPipe } from './common/pipes/trim.pipe';
 
 const logger = new Logger('Bootstrap');
 
@@ -100,6 +101,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   app.useGlobalPipes(
+    new TrimPipe(),
     new ValidationPipe({
       whitelist: true,
       transform: true,
