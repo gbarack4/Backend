@@ -15,6 +15,7 @@ export class PublicWebsitesService {
       .select({
         schoolId: schema.schools.id,
         schoolName: schema.schools.name,
+        logoUrl: schema.schools.logoUrl,
         templateName: schema.websiteTemplates.name,
         baseConfig: schema.websiteTemplates.config,
         customConfig: schema.schoolWebsites.config,
@@ -53,6 +54,7 @@ export class PublicWebsitesService {
     return {
       schoolId: record.schoolId,
       schoolName: record.schoolName,
+      logoUrl: record.logoUrl,
       templateName: record.templateName,
       config: mergedConfig,
     };

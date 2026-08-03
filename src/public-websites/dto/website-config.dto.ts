@@ -14,6 +14,14 @@ export class WebsiteConfigDto {
   schoolName!: string;
 
   @ApiProperty({
+    description: 'The URL of the school logo',
+    example: 'https://example.com/logo.png',
+    required: false,
+    nullable: true,
+  })
+  logoUrl?: string | null;
+
+  @ApiProperty({
     description: 'The identifier of the active visual template',
     example: 'modern-dark',
   })
