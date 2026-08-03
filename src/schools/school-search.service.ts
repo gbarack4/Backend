@@ -42,22 +42,22 @@ export class SchoolSearchService {
       );
     }
 
-    if (
-      query.originLat !== undefined &&
-      query.originLng !== undefined &&
-      !hasBboxFilter
-    ) {
-      const radiusMeters = query.radiusKm
-        ? query.radiusKm * 1000
-        : DEFAULT_SEARCH_RADIUS_METERS;
-      conditions.push(
-        sql`ST_DWithin(
-          ${schema.locations.publicCoordinates}::geography,
-          ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography,
-          ${radiusMeters}
-        )`,
-      );
-    }
+    // if (
+    //   query.originLat !== undefined &&
+    //   query.originLng !== undefined &&
+    //   !hasBboxFilter
+    // ) {
+    //   const radiusMeters = query.radiusKm
+    //     ? query.radiusKm * 1000
+    //     : DEFAULT_SEARCH_RADIUS_METERS;
+    //   conditions.push(
+    //     sql`ST_DWithin(
+    //       ${schema.locations.publicCoordinates}::geography,
+    //       ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography,
+    //       ${radiusMeters}
+    //     )`,
+    //   );
+    // }
 
     const sortingExpression =
       query.originLat !== undefined && query.originLng !== undefined
