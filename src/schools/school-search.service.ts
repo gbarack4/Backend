@@ -4,7 +4,6 @@ import { and, eq, ilike, sql, SQL } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
 import { SchoolSearchResult } from './interfaces/school-search-result.interface';
-import { DEFAULT_SEARCH_RADIUS_METERS } from './constants/school.constants';
 
 @Injectable()
 export class SchoolSearchService {
@@ -42,22 +41,21 @@ export class SchoolSearchService {
       );
     }
 
-    // if (
-    //   query.originLat !== undefined &&
-    //   query.originLng !== undefined &&
-    //   !hasBboxFilter
-    // ) {
-    //   const radiusMeters = query.radiusKm
-    //     ? query.radiusKm * 1000
-    //     : DEFAULT_SEARCH_RADIUS_METERS;
-    //   conditions.push(
-    //     sql`ST_DWithin(
-    //       ${schema.locations.publicCoordinates}::geography,
-    //       ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography,
-    //       ${radiusMeters}
-    //     )`,
-    //   );
-    // }
+    if (
+      query.originLat !== undefined &&
+      query.originLng !== undefined &&
+      !hasBboxFilter &&
+      query.radiusKm
+    ) {
+      const radiusMeters = query.radiusKm * 1000;
+      conditions.push(
+        sql`ST_DWithin(
+          ${schema.locations.publicCoordinates}::geography,
+          ST_SetSRID(ST_MakePoint(${query.originLng}, ${query.originLat}), 4326)::geography,
+          ${radiusMeters}
+        )`,
+      );
+    }
 
     const sortingExpression =
       query.originLat !== undefined && query.originLng !== undefined
