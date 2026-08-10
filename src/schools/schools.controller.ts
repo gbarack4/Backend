@@ -167,8 +167,11 @@ export class SchoolsController {
     status: 200,
     description: 'Returns an array of schools matching the search criteria',
   })
-  async search(@Query() query: SearchSchoolsDto) {
-    return this.schoolSearchService.searchSchools(query);
+  async search(
+    @CurrentUser() user: UserEntity,
+    @Query() query: SearchSchoolsDto,
+  ) {
+    return this.schoolSearchService.searchSchools(query, user.id);
   }
 
   @Get(':id')
@@ -176,8 +179,9 @@ export class SchoolsController {
   @ApiResponse({ status: 200, description: 'Returns school entity' })
   @ApiResponse({ status: 404, description: 'School not found' })
   async getSchoolById(
+    @CurrentUser() user: UserEntity,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ) {
-    return this.schoolsService.getSchoolById(id);
+    return this.schoolsService.getSchoolById(id, user.id);
   }
 }

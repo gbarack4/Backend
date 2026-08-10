@@ -14,9 +14,10 @@ import { CreateJoinRequestDto } from './dto/create-join-request.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { UserEntity } from '@/auth/interfaces/auth.interface';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 
 @Controller('join-requests')
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, RequireDbUserGuard)
 export class JoinRequestsController {
   constructor(
     private readonly instructorSchoolsService: InstructorSchoolsService,

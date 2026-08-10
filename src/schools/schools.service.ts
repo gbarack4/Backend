@@ -46,7 +46,7 @@ export class SchoolsService {
     }
   }
 
-  async getSchoolById(id: string) {
+  async getSchoolById(id: string, userId?: string) {
     const school = await this.db.query.schools.findFirst({
       where: eq(schema.schools.id, id),
       columns: {
@@ -74,6 +74,29 @@ export class SchoolsService {
         eq(schema.schoolDomains.isPrimary, true),
       ),
     });
+
+    let joinStatus = 'none';
+
+    if (userId) {
+      const instructor = await this.db.query.instructors.findFirst({
+        where: eq(schema.instructors.userId, userId),
+        columns: { id: true },
+      });
+
+      if (instructor) {
+        const membership = await this.db.query.instructorSchools.findFirst({
+          where: and(
+            eq(schema.instructorSchools.schoolId, id),
+            eq(schema.instructorSchools.instructorId, instructor.id),
+          ),
+          columns: { status: true },
+        });
+
+        if (membership) {
+          joinStatus = membership.status;
+        }
+      }
+    }
 
     const rawReviews = await this.db
       .select({
@@ -129,6 +152,7 @@ export class SchoolsService {
       email: school.email || null,
       website: primaryDomain?.domain || null,
       reviews: reviews,
+      joinStatus: joinStatus,
     };
   }
 }

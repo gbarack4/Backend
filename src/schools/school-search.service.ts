@@ -13,10 +13,27 @@ export class SchoolSearchService {
     @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  async searchSchools(query: SearchSchoolsDto): Promise<SchoolSearchResult[]> {
+  async searchSchools(
+    query: SearchSchoolsDto,
+    userId?: string,
+  ): Promise<SchoolSearchResult[]> {
     this.logger.debug(
       `Searching schools with params: ${JSON.stringify(query)}`,
     );
+
+    let actualInstructorId: string | null = null;
+    if (userId) {
+      const [instructor] = await this.db
+        .select({ id: schema.instructors.id })
+        .from(schema.instructors)
+        .where(eq(schema.instructors.userId, userId))
+        .limit(1);
+
+      if (instructor) {
+        actualInstructorId = instructor.id;
+      }
+    }
+
     const conditions: SQL[] = [];
 
     conditions.push(eq(schema.schools.status, 'active'));
@@ -108,7 +125,6 @@ export class SchoolSearchService {
           latitude: sql<
             number | null
           >`ST_Y(${schema.locations.publicCoordinates}::geometry)`,
-
           distance:
             query.originLat !== undefined && query.originLng !== undefined
               ? sql<number | null>`CAST(ST_Distance(
@@ -118,6 +134,14 @@ export class SchoolSearchService {
               : sql<null>`NULL`,
           rating: sql<number>`COALESCE(${schoolStats.rating}, 0)::float`,
           reviewCount: sql<number>`COALESCE(${schoolStats.reviewCount}, 0)::int`,
+          joinStatus: actualInstructorId
+            ? sql<string>`COALESCE(
+                (SELECT ${schema.instructorSchools.status} 
+                 FROM ${schema.instructorSchools} 
+                 WHERE ${schema.instructorSchools.schoolId} = ${schema.schools.id} 
+                 AND ${schema.instructorSchools.instructorId} = ${actualInstructorId} 
+                 LIMIT 1), 'none')`
+            : sql<string>`'none'`,
         })
         .from(schema.schools)
         .leftJoin(
