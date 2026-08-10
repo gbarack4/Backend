@@ -9,6 +9,7 @@ import {
   NotFoundException,
   Query,
   Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { SchoolsService } from './schools.service';
 import { SetupSchoolDto } from './dto/setup-school.dto';
@@ -174,7 +175,9 @@ export class SchoolsController {
   @ApiOperation({ summary: 'Get a driving school by its unique identifier' })
   @ApiResponse({ status: 200, description: 'Returns school entity' })
   @ApiResponse({ status: 404, description: 'School not found' })
-  async getSchoolById(@Param('id') id: string) {
+  async getSchoolById(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     return this.schoolsService.getSchoolById(id);
   }
 }

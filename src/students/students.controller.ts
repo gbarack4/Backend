@@ -6,6 +6,7 @@ import {
   UseGuards,
   Get,
   Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
@@ -45,7 +46,7 @@ export class StudentsController {
   @ApiResponse({ status: 404, description: 'Student or user not found' })
   async getMyStudentProfile(
     @CurrentUser() user: UserEntity,
-    @Param('schoolId') schoolId: string,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
   ) {
     return this.studentsService.getStudentByUserIdAndSchool(user.id, schoolId);
   }
@@ -62,7 +63,7 @@ export class StudentsController {
   @ApiResponse({ status: 404, description: 'Student record not found' })
   async updateMyAvatar(
     @CurrentUser() user: UserEntity,
-    @Param('schoolId') schoolId: string,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
     @Body() dto: UpdateStudentAvatarDto,
   ) {
     return this.studentsService.updateAvatarUrl(
@@ -85,7 +86,7 @@ export class StudentsController {
   @ApiResponse({ status: 404, description: 'Student record not found' })
   async updateMyPersonalInfo(
     @CurrentUser() user: UserEntity,
-    @Param('schoolId') schoolId: string,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
     @Body() dto: UpdateStudentPersonalInfoDto,
   ) {
     return this.studentsService.updatePersonalInfo(user.id, schoolId, dto);
