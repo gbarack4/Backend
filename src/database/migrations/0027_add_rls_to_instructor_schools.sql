@@ -1,0 +1,2 @@
+CREATE POLICY "isolate_instructor_schools_school" ON "instructor_schools" AS PERMISSIVE FOR ALL TO public USING ((school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid));--> statement-breakpoint
+CREATE POLICY "isolate_instructor_schools_instructor" ON "instructor_schools" AS PERMISSIVE FOR ALL TO public USING (instructor_id IN (SELECT id FROM instructors WHERE user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid));

@@ -58,6 +58,18 @@ export const instructorSchools = pgTable(
       'instructor_schools_source_check',
       sql`source = ANY (ARRAY['instructor_request'::text, 'school_invite'::text])`,
     ),
+    pgPolicy('isolate_instructor_schools_school', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+    pgPolicy('isolate_instructor_schools_instructor', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`instructor_id IN (SELECT id FROM instructors WHERE user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)`,
+    }),
   ],
 ).enableRLS();
 
