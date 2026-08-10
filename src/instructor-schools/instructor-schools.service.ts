@@ -106,4 +106,104 @@ export class InstructorSchoolsService {
 
     return updated;
   }
+
+  async createSchoolInvite(schoolId: string, instructorId: string) {
+    try {
+      const [invite] = await this.db
+        .insert(schema.instructorSchools)
+        .values({
+          instructorId,
+          schoolId,
+          status: 'pending',
+          source: 'school_invite',
+        })
+        .returning();
+
+      // TODO: SuprSend integration (sending notification to instructor)
+      // await this.suprSendService.triggerInviteNotification(instructorId, schoolId);
+
+      return invite;
+    } catch (error) {
+      const dbError = error as { code?: string };
+      if (dbError.code === '23505') {
+        throw new ConflictException(
+          'A request or invite already exists for this instructor',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async findInstructorInvites(userId: string) {
+    const [instructor] = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId));
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    return this.db
+      .select({
+        id: schema.instructorSchools.id,
+        status: schema.instructorSchools.status,
+        createdAt: schema.instructorSchools.createdAt,
+        school: {
+          id: schema.schools.id,
+          name: schema.schools.name,
+          logoUrl: schema.schools.logoUrl,
+          slug: schema.schools.slug,
+        },
+      })
+      .from(schema.instructorSchools)
+      .innerJoin(
+        schema.schools,
+        eq(schema.instructorSchools.schoolId, schema.schools.id),
+      )
+      .where(
+        and(
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.source, 'school_invite'),
+          eq(schema.instructorSchools.status, 'pending'),
+        ),
+      );
+  }
+
+  async respondToInvite(
+    userId: string,
+    inviteId: string,
+    status: 'accepted' | 'rejected',
+  ) {
+    const [instructor] = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId));
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    const [updated] = await this.db
+      .update(schema.instructorSchools)
+      .set({
+        status,
+        respondedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(schema.instructorSchools.id, inviteId),
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.source, 'school_invite'),
+          eq(schema.instructorSchools.status, 'pending'),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundException('Invite not found or already processed');
+    }
+
+    return updated;
+  }
 }

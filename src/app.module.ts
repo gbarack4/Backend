@@ -10,6 +10,7 @@ import { GoogleModule } from './google/google.module';
 import { PublicWebsitesModule } from './public-websites/public-websites.module';
 import { InstructorsModule } from './instructors/instructors.module';
 import { StudentsModule } from './students/students.module';
+import { InstructorSchoolsModule } from './instructor-schools/instructor-schools.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StudentsModule } from './students/students.module';
     PublicWebsitesModule,
     InstructorsModule,
     StudentsModule,
+    InstructorSchoolsModule,
   ],
   controllers: [],
   providers: [],
