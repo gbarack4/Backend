@@ -7,11 +7,13 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, desc } from 'drizzle-orm';
 import * as schema from '../database/schema';
+import { SuprSendService } from '@/suprsend/suprsend.service';
 
 @Injectable()
 export class InstructorSchoolsService {
   constructor(
     @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    private readonly suprSendService: SuprSendService,
   ) {}
 
   async createJoinRequest(userId: string, schoolId: string) {
@@ -119,8 +121,28 @@ export class InstructorSchoolsService {
         })
         .returning();
 
-      // TODO: SuprSend integration (sending notification to instructor)
-      // await this.suprSendService.triggerInviteNotification(instructorId, schoolId);
+      const [instructorData] = await this.db
+        .select({
+          userId: schema.instructors.userId,
+          email: schema.users.email,
+        })
+        .from(schema.instructors)
+        .innerJoin(schema.users, eq(schema.instructors.userId, schema.users.id))
+        .where(eq(schema.instructors.id, instructorId));
+
+      const [schoolData] = await this.db
+        .select({ name: schema.schools.name })
+        .from(schema.schools)
+        .where(eq(schema.schools.id, schoolId));
+
+      if (instructorData && schoolData) {
+        await this.suprSendService.sendSchoolInviteNotification({
+          recipientUserId: instructorData.userId,
+          recipientEmail: instructorData.email,
+          schoolName: schoolData.name,
+          inviteId: invite.id,
+        });
+      }
 
       return invite;
     } catch (error) {

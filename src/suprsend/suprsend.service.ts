@@ -1,0 +1,83 @@
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Suprsend, Event } from '@suprsend/node-sdk';
+
+interface ISuprsendEvent {
+  distinct_id: string;
+  event_name: string;
+  properties?: Record<string, unknown>;
+}
+
+interface ISuprsendClient {
+  track_event(event: ISuprsendEvent): Promise<{
+    success: boolean;
+    status: string;
+    status_code: number;
+    message: string;
+  }>;
+}
+
+const SafeSuprsend = Suprsend as unknown as new (
+  key: string,
+  secret: string,
+) => ISuprsendClient;
+
+const SafeEvent = Event as unknown as new (
+  distinct_id: string,
+  event_name: string,
+  properties?: Record<string, unknown>,
+) => ISuprsendEvent;
+
+@Injectable()
+export class SuprSendService implements OnModuleInit {
+  private readonly logger = new Logger(SuprSendService.name);
+
+  private suprsendClient: ISuprsendClient | null = null;
+
+  onModuleInit() {
+    const apiKey = process.env.SUPRSEND_WORKSPACE_KEY;
+    const apiSecret = process.env.SUPRSEND_WORKSPACE_SECRET;
+
+    if (!apiKey || !apiSecret) {
+      this.logger.warn(
+        'SuprSend credentials are missing in environment variables!',
+      );
+      return;
+    }
+
+    this.suprsendClient = new SafeSuprsend(apiKey, apiSecret);
+  }
+
+  async sendSchoolInviteNotification(payload: {
+    recipientUserId: string;
+    recipientEmail: string;
+    schoolName: string;
+    inviteId: string;
+  }) {
+    if (!this.suprsendClient) {
+      this.logger.warn('SuprSend client is not initialized. Skipping event.');
+      return;
+    }
+
+    try {
+      const event = new SafeEvent(
+        payload.recipientUserId,
+        'SCHOOL_INVITE_CREATED',
+        {
+          school_name: payload.schoolName,
+          invite_id: payload.inviteId,
+          $email: [payload.recipientEmail],
+        },
+      );
+
+      const response = await this.suprsendClient.track_event(event);
+
+      this.logger.log(
+        `SuprSend invite notification triggered for user: ${payload.recipientUserId}`,
+      );
+
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to trigger SuprSend notification', error);
+    }
+  }
+}
