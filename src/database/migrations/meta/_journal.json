@@ -197,6 +197,13 @@
       "when": 1786349910803,
       "tag": "0027_add_rls_to_instructor_schools",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786442271363,
+      "tag": "0028_add_paused_status_to_instructor_schools",
+      "breakpoints": true
     }
   ]
 }

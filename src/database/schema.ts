@@ -52,7 +52,7 @@ export const instructorSchools = pgTable(
     ),
     check(
       'instructor_schools_status_check',
-      sql`status = ANY (ARRAY['pending'::text, 'accepted'::text, 'rejected'::text, 'blocked'::text])`,
+      sql`status = ANY (ARRAY['pending'::text, 'accepted'::text, 'rejected'::text, 'blocked'::text, 'paused'::text])`,
     ),
     check(
       'instructor_schools_source_check',
