@@ -5,7 +5,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { SuprSendService } from '@/suprsend/suprsend.service';
 
@@ -51,7 +51,7 @@ export class InstructorSchoolsService {
 
   async findSchoolRequests(
     schoolId: string,
-    status?: 'pending' | 'accepted' | 'rejected',
+    status?: 'pending' | 'accepted' | 'rejected' | 'paused',
   ) {
     const conditions = [
       eq(schema.instructorSchools.schoolId, schoolId),
@@ -227,5 +227,117 @@ export class InstructorSchoolsService {
     }
 
     return updated;
+  }
+
+  async cancelJoinRequest(userId: string, schoolId: string) {
+    const [instructor] = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId));
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    const [deletedRequest] = await this.db
+      .delete(schema.instructorSchools)
+      .where(
+        and(
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.schoolId, schoolId),
+          eq(schema.instructorSchools.status, 'pending'),
+          eq(schema.instructorSchools.source, 'instructor_request'),
+        ),
+      )
+      .returning();
+
+    if (!deletedRequest) {
+      throw new NotFoundException('Pending join request not found');
+    }
+
+    return { success: true, message: 'Request cancelled successfully' };
+  }
+
+  async togglePauseStatus(userId: string, schoolId: string, pause: boolean) {
+    const [instructor] = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId));
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    const expectedCurrentStatus = pause ? 'accepted' : 'paused';
+    const newStatus = pause ? 'paused' : 'accepted';
+
+    const [updated] = await this.db
+      .update(schema.instructorSchools)
+      .set({ status: newStatus })
+      .where(
+        and(
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.schoolId, schoolId),
+          eq(schema.instructorSchools.status, expectedCurrentStatus),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      throw new ConflictException(
+        `Cannot change pause status. Current status might not be '${expectedCurrentStatus}'.`,
+      );
+    }
+
+    return updated;
+  }
+
+  async deactivateMembership(userId: string, schoolId: string) {
+    const [instructor] = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId));
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    const activeBookings = await this.db
+      .select({ id: schema.bookings.id })
+      .from(schema.bookings)
+      .where(
+        and(
+          eq(schema.bookings.instructorId, instructor.id),
+          eq(schema.bookings.schoolId, schoolId),
+          inArray(schema.bookings.status, ['pending', 'confirmed']),
+        ),
+      )
+      .limit(1);
+
+    if (activeBookings.length > 0) {
+      throw new ConflictException(
+        'Cannot deactivate membership. You have active or upcoming bookings with this school. Please complete or cancel them first.',
+      );
+    }
+
+    const [deletedMembership] = await this.db
+      .delete(schema.instructorSchools)
+      .where(
+        and(
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.schoolId, schoolId),
+          inArray(schema.instructorSchools.status, ['accepted', 'paused']),
+        ),
+      )
+      .returning();
+
+    if (!deletedMembership) {
+      throw new NotFoundException('Active school membership not found');
+    }
+
+    return {
+      success: true,
+      message: 'Successfully deactivated and left the school',
+    };
   }
 }

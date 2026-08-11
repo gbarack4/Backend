@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { JoinRequestsController } from './join-requests.controller';
 import { InstructorSchoolsService } from './instructor-schools.service';
 import { DatabaseModule } from '../database/database.module';
-import { InvitesController } from './invites.controller';
 import { SuprSendModule } from '@/suprsend/suprsend.module';
+import { InstructorController } from './instructor.controller';
+import { SchoolAdminController } from './school-admin.controller';
 
 @Module({
   imports: [DatabaseModule, SuprSendModule],
-  controllers: [JoinRequestsController, InvitesController],
+  controllers: [InstructorController, SchoolAdminController],
   providers: [InstructorSchoolsService],
   exports: [InstructorSchoolsService],
 })
