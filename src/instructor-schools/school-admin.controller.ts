@@ -13,11 +13,29 @@ import {
 } from '@nestjs/common';
 import { InstructorSchoolsService } from './instructor-schools.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
+import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
+import { Roles } from '@/auth/decorators/roles.decorator';
 
 @Controller('school-admin')
-@UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+@UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
+@Roles('owner', 'admin')
 export class SchoolAdminController {
   constructor(private readonly service: InstructorSchoolsService) {}
+
+  @Get('instructors/:schoolId')
+  async getInstructors(
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
+  ) {
+    return this.service.getSchoolInstructors(schoolId);
+  }
+
+  @Get('instructors/profile/:id')
+  async getInstructorProfile(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Headers('x-school-id') schoolId: string,
+  ) {
+    return this.service.getInstructorProfile(schoolId, id);
+  }
 
   @Get('requests/:schoolId')
   async getRequests(

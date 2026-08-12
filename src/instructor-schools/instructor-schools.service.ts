@@ -5,7 +5,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { SuprSendService } from '@/suprsend/suprsend.service';
 
@@ -26,26 +26,60 @@ export class InstructorSchoolsService {
       throw new NotFoundException('Instructor profile not found');
     }
 
-    try {
-      const [request] = await this.db
-        .insert(schema.instructorSchools)
-        .values({
-          instructorId: instructor.id,
-          schoolId,
+    const [result] = await this.db
+      .insert(schema.instructorSchools)
+      .values({
+        instructorId: instructor.id,
+        schoolId,
+        status: 'pending',
+        source: 'instructor_request',
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.instructorSchools.instructorId,
+          schema.instructorSchools.schoolId,
+        ],
+        set: {
           status: 'pending',
           source: 'instructor_request',
-        })
-        .returning();
+          respondedAt: null,
+          createdAt: sql`now()`,
+        },
+        where: eq(schema.instructorSchools.status, 'rejected'),
+      })
+      .returning();
 
-      return request;
-    } catch (error: unknown) {
-      const dbError = error as { code?: string };
-      if (dbError.code === '23505') {
+    if (result) {
+      return result;
+    }
+
+    const [existingRequest] = await this.db
+      .select({ status: schema.instructorSchools.status })
+      .from(schema.instructorSchools)
+      .where(
+        and(
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.schoolId, schoolId),
+        ),
+      );
+
+    switch (existingRequest?.status) {
+      case 'accepted':
+        throw new ConflictException('You are already a member of this school');
+      case 'pending':
         throw new ConflictException(
-          'A request or invite already exists for this school',
+          'You already have a pending request to this school',
         );
-      }
-      throw error;
+      case 'blocked':
+        throw new ConflictException(
+          'You have been blocked from this school. Please contact the school.',
+        );
+      case 'paused':
+        throw new ConflictException(
+          'Your membership with this school is currently paused',
+        );
+      default:
+        throw new ConflictException('Unable to process join request');
     }
   }
 
@@ -70,6 +104,7 @@ export class InstructorSchoolsService {
         instructor: {
           id: schema.instructors.id,
           name: schema.instructors.name,
+          email: schema.users.email,
           avatarUrl: schema.instructors.avatarUrl,
           yearsOfExperience: schema.instructors.yearsOfExperience,
           documents: schema.instructors.documents,
@@ -81,6 +116,7 @@ export class InstructorSchoolsService {
         schema.instructors,
         eq(schema.instructorSchools.instructorId, schema.instructors.id),
       )
+      .innerJoin(schema.users, eq(schema.instructors.userId, schema.users.id))
       .where(and(...conditions))
       .orderBy(desc(schema.instructorSchools.createdAt));
   }
@@ -339,5 +375,73 @@ export class InstructorSchoolsService {
       success: true,
       message: 'Successfully deactivated and left the school',
     };
+  }
+
+  async getSchoolInstructors(schoolId: string) {
+    return this.db
+      .select({
+        id: schema.instructorSchools.id,
+        status: schema.instructorSchools.status,
+        createdAt: schema.instructorSchools.createdAt,
+        instructor: {
+          id: schema.instructors.id,
+          name: schema.instructors.name,
+          email: schema.users.email,
+          avatarUrl: schema.instructors.avatarUrl,
+          yearsOfExperience: schema.instructors.yearsOfExperience,
+          transmissionType: schema.instructors.transmissionType,
+        },
+      })
+      .from(schema.instructorSchools)
+      .innerJoin(
+        schema.instructors,
+        eq(schema.instructorSchools.instructorId, schema.instructors.id),
+      )
+      .innerJoin(schema.users, eq(schema.instructors.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.instructorSchools.schoolId, schoolId),
+          eq(schema.instructorSchools.status, 'accepted'),
+        ),
+      )
+      .orderBy(desc(schema.instructorSchools.createdAt));
+  }
+
+  async getInstructorProfile(schoolId: string, instructorId: string) {
+    const [result] = await this.db
+      .select({
+        id: schema.instructors.id,
+        name: schema.instructors.name,
+        email: schema.users.email,
+        phone: schema.instructors.phone,
+        addressLine1: schema.instructors.addressLine1,
+        addressLine2: schema.instructors.addressLine2,
+        suburb: schema.instructors.suburb,
+        state: schema.instructors.state,
+        postcode: schema.instructors.postcode,
+        avatarUrl: schema.instructors.avatarUrl,
+        yearsOfExperience: schema.instructors.yearsOfExperience,
+        transmissionType: schema.instructors.transmissionType,
+        status: schema.instructorSchools.status,
+        createdAt: schema.instructorSchools.createdAt,
+      })
+      .from(schema.instructorSchools)
+      .innerJoin(
+        schema.instructors,
+        eq(schema.instructorSchools.instructorId, schema.instructors.id),
+      )
+      .innerJoin(schema.users, eq(schema.instructors.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.instructorSchools.schoolId, schoolId),
+          eq(schema.instructorSchools.instructorId, instructorId),
+        ),
+      );
+
+    if (!result) {
+      throw new NotFoundException('Instructor not found in this school');
+    }
+
+    return result;
   }
 }

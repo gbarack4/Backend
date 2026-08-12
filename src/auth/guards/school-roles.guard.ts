@@ -31,7 +31,9 @@ export class SchoolRolesGuard implements CanActivate {
       (request.query?.schoolId as string);
 
     if (!schoolId) {
-      throw new BadRequestException('Header "x-school-id" is required');
+      throw new BadRequestException(
+        'schoolId (header, param, or query) is required',
+      );
     }
 
     const userId = request.currentUser?.id;
