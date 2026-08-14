@@ -69,11 +69,22 @@ export class SuprSendService implements OnModuleInit {
     }
 
     try {
-      const user = this.suprsendClient.user.get_instance(
-        payload.recipientEmail,
-      );
-      user.add_email(payload.recipientEmail);
-      await user.save();
+      try {
+        const user = this.suprsendClient.user.get_instance(
+          payload.recipientEmail,
+        );
+        user.add_email(payload.recipientEmail);
+        await user.save();
+      } catch (profileError) {
+        const errorMessage =
+          profileError instanceof Error
+            ? profileError.message
+            : String(profileError);
+
+        this.logger.warn(
+          `Failed to update SuprSend profile for ${payload.recipientEmail}: ${errorMessage}`,
+        );
+      }
 
       const event = new SafeEvent(
         payload.recipientEmail,
