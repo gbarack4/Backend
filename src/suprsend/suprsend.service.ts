@@ -7,6 +7,11 @@ interface ISuprsendEvent {
   properties?: Record<string, unknown>;
 }
 
+interface ISuprsendUserInstance {
+  add_email(email: string): void;
+  save(): Promise<any>;
+}
+
 interface ISuprsendClient {
   track_event(event: ISuprsendEvent): Promise<{
     success: boolean;
@@ -14,6 +19,9 @@ interface ISuprsendClient {
     status_code: number;
     message: string;
   }>;
+  user: {
+    get_instance(distinct_id: string): ISuprsendUserInstance;
+  };
 }
 
 const SafeSuprsend = Suprsend as unknown as new (
@@ -61,6 +69,12 @@ export class SuprSendService implements OnModuleInit {
     }
 
     try {
+      const user = this.suprsendClient.user.get_instance(
+        payload.recipientEmail,
+      );
+      user.add_email(payload.recipientEmail);
+      await user.save();
+
       const event = new SafeEvent(
         payload.recipientEmail,
         'SCHOOL_INVITE_CREATED',
