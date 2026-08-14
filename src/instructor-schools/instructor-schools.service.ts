@@ -145,38 +145,58 @@ export class InstructorSchoolsService {
     return updated;
   }
 
-  async createSchoolInvite(schoolId: string, instructorId: string) {
+  async createSchoolInvite(
+    schoolId: string,
+    email: string,
+    inviteeName?: string,
+    customMessage?: string,
+  ) {
     try {
+      const [user] = await this.db
+        .select({ id: schema.users.id, email: schema.users.email })
+        .from(schema.users)
+        .where(eq(schema.users.email, email));
+
+      if (!user) {
+        throw new NotFoundException(
+          'User with this email is not registered on the platform',
+        );
+      }
+
+      const [instructorData] = await this.db
+        .select({ id: schema.instructors.id })
+        .from(schema.instructors)
+        .where(eq(schema.instructors.userId, user.id));
+
+      if (!instructorData) {
+        throw new NotFoundException(
+          'This user is registered but does not have an instructor profile',
+        );
+      }
+
       const [invite] = await this.db
         .insert(schema.instructorSchools)
         .values({
-          instructorId,
+          instructorId: instructorData.id,
           schoolId,
           status: 'pending',
           source: 'school_invite',
         })
         .returning();
 
-      const [instructorData] = await this.db
-        .select({
-          userId: schema.instructors.userId,
-          email: schema.users.email,
-        })
-        .from(schema.instructors)
-        .innerJoin(schema.users, eq(schema.instructors.userId, schema.users.id))
-        .where(eq(schema.instructors.id, instructorId));
-
       const [schoolData] = await this.db
         .select({ name: schema.schools.name })
         .from(schema.schools)
         .where(eq(schema.schools.id, schoolId));
 
-      if (instructorData && schoolData) {
+      if (schoolData) {
         await this.suprSendService.sendSchoolInviteNotification({
-          recipientUserId: instructorData.userId,
-          recipientEmail: instructorData.email,
+          recipientUserId: user.id,
+          recipientEmail: user.email,
           schoolName: schoolData.name,
           inviteId: invite.id,
+          inviteeName: inviteeName,
+          customMessage: customMessage,
         });
       }
 

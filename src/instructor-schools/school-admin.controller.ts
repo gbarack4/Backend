@@ -59,6 +59,11 @@ export class SchoolAdminController {
     @Headers('x-school-id') schoolId: string,
     @Body() dto: CreateInviteDto,
   ) {
-    return this.service.createSchoolInvite(schoolId, dto.instructorId);
+    return this.service.createSchoolInvite(
+      schoolId,
+      dto.email,
+      dto.name,
+      dto.message,
+    );
   }
 }

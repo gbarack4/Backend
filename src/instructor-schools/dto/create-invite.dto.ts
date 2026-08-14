@@ -1,6 +1,15 @@
-import { IsUUID } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateInviteDto {
-  @IsUUID('4')
-  instructorId!: string;
+  @IsEmail()
+  @IsNotEmpty()
+  email!: string;
+
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  message?: string;
 }

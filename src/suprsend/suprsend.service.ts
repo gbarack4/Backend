@@ -52,6 +52,8 @@ export class SuprSendService implements OnModuleInit {
     recipientEmail: string;
     schoolName: string;
     inviteId: string;
+    inviteeName?: string;
+    customMessage?: string;
   }) {
     if (!this.suprsendClient) {
       this.logger.warn('SuprSend client is not initialized. Skipping event.');
@@ -60,19 +62,21 @@ export class SuprSendService implements OnModuleInit {
 
     try {
       const event = new SafeEvent(
-        payload.recipientUserId,
+        payload.recipientEmail,
         'SCHOOL_INVITE_CREATED',
         {
           school_name: payload.schoolName,
           invite_id: payload.inviteId,
           $email: [payload.recipientEmail],
+          invitee_name: payload.inviteeName,
+          custom_message: payload.customMessage,
         },
       );
 
       const response = await this.suprsendClient.track_event(event);
 
       this.logger.log(
-        `SuprSend invite notification triggered for user: ${payload.recipientUserId}`,
+        `SuprSend invite notification triggered for email: ${payload.recipientEmail}`,
       );
 
       return response;
