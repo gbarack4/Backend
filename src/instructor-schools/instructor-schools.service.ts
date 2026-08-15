@@ -89,7 +89,10 @@ export class InstructorSchoolsService {
   ) {
     const conditions = [
       eq(schema.instructorSchools.schoolId, schoolId),
-      eq(schema.instructorSchools.source, 'instructor_request'),
+      inArray(schema.instructorSchools.source, [
+        'instructor_request',
+        'school_invite',
+      ]),
     ];
 
     if (status) {
@@ -100,6 +103,7 @@ export class InstructorSchoolsService {
       .select({
         id: schema.instructorSchools.id,
         status: schema.instructorSchools.status,
+        source: schema.instructorSchools.source,
         createdAt: schema.instructorSchools.createdAt,
         instructor: {
           id: schema.instructors.id,
@@ -486,5 +490,61 @@ export class InstructorSchoolsService {
     }
 
     return result;
+  }
+
+  async getSchoolInviteById(userId: string, inviteId: string) {
+    const [instructor] = await this.db
+      .select({ id: schema.instructors.id })
+      .from(schema.instructors)
+      .where(eq(schema.instructors.userId, userId));
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor profile not found');
+    }
+
+    const [inviteData] = await this.db
+      .select({
+        id: schema.instructorSchools.id,
+        status: schema.instructorSchools.status,
+        createdAt: schema.instructorSchools.createdAt,
+        school: {
+          id: schema.schools.id,
+          name: schema.schools.name,
+          logoUrl: schema.schools.logoUrl,
+          coverImageUrl: schema.schools.coverImageUrl,
+        },
+        owner: {
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+        },
+        location: {
+          addressLine1: schema.locations.addressLine1,
+          suburb: schema.locations.suburb,
+        },
+      })
+      .from(schema.instructorSchools)
+      .innerJoin(
+        schema.schools,
+        eq(schema.instructorSchools.schoolId, schema.schools.id),
+      )
+      .innerJoin(schema.users, eq(schema.schools.ownerUserId, schema.users.id))
+      .innerJoin(
+        schema.locations,
+        eq(schema.schools.id, schema.locations.schoolId),
+      )
+      .where(
+        and(
+          eq(schema.instructorSchools.id, inviteId),
+          eq(schema.instructorSchools.instructorId, instructor.id),
+          eq(schema.instructorSchools.source, 'school_invite'),
+        ),
+      )
+      .limit(1);
+
+    if (!inviteData) {
+      throw new NotFoundException('Invite not found');
+    }
+
+    return inviteData;
   }
 }

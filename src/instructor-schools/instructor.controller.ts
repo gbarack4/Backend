@@ -42,6 +42,14 @@ export class InstructorController {
     return this.service.findInstructorInvites(user.id);
   }
 
+  @Get('invites/:id')
+  async getInviteById(
+    @CurrentUser() user: UserEntity,
+    @Param('id') inviteId: string,
+  ) {
+    return this.service.getSchoolInviteById(user.id, inviteId);
+  }
+
   @Patch('invites/:id/accept')
   async accept(
     @CurrentUser() user: UserEntity,
