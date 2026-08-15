@@ -148,7 +148,7 @@ export class InstructorSchoolsService {
   async createSchoolInvite(
     schoolId: string,
     email: string,
-    inviteeName?: string,
+    instructorName: string,
     customMessage?: string,
   ) {
     try {
@@ -185,18 +185,41 @@ export class InstructorSchoolsService {
         .returning();
 
       const [schoolData] = await this.db
-        .select({ name: schema.schools.name })
+        .select({
+          name: schema.schools.name,
+          email: schema.schools.email,
+          ownerEmail: schema.users.email,
+        })
         .from(schema.schools)
+        .innerJoin(
+          schema.users,
+          eq(schema.schools.ownerUserId, schema.users.id),
+        )
         .where(eq(schema.schools.id, schoolId));
-
       if (schoolData) {
+        const resolvedEmail =
+          schoolData.email ??
+          schoolData.ownerEmail ??
+          'noreply@driveinstructor.pro';
+
+        const expiryDays = Number.parseInt(
+          process.env.INVITE_EXPIRY_DAYS || '7',
+          10,
+        );
+
+        const baseUrl = process.env.INSTRUCTOR_APP_URL;
+        const inviteUrl = `${baseUrl}/invite?id=${invite.id}`;
+
         await this.suprSendService.sendSchoolInviteNotification({
           recipientUserId: user.id,
           recipientEmail: user.email,
           schoolName: schoolData.name,
+          schoolEmail: resolvedEmail,
           inviteId: invite.id,
-          inviteeName: inviteeName,
+          inviteUrl: inviteUrl,
+          instructorName: instructorName,
           customMessage: customMessage,
+          expiryDays: expiryDays,
         });
       }
 

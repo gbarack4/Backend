@@ -60,8 +60,11 @@ export class SuprSendService implements OnModuleInit {
     recipientEmail: string;
     schoolName: string;
     inviteId: string;
-    inviteeName?: string;
     customMessage?: string;
+    schoolEmail: string;
+    instructorName: string;
+    inviteUrl: string;
+    expiryDays: number;
   }) {
     if (!this.suprsendClient) {
       this.logger.warn('SuprSend client is not initialized. Skipping event.');
@@ -90,11 +93,15 @@ export class SuprSendService implements OnModuleInit {
         payload.recipientEmail,
         'SCHOOL_INVITE_CREATED',
         {
-          school_name: payload.schoolName,
-          invite_id: payload.inviteId,
           $email: [payload.recipientEmail],
-          invitee_name: payload.inviteeName,
+          school_name: payload.schoolName,
+          school_email: payload.schoolEmail,
+          instructor_name: payload.instructorName,
+          invite_url: payload.inviteUrl,
+          invite_id: payload.inviteId,
           custom_message: payload.customMessage,
+          expiry_days: payload.expiryDays,
+          year: new Date().getFullYear(),
         },
       );
 

@@ -6,8 +6,8 @@ export class CreateInviteDto {
   email!: string;
 
   @IsString()
-  @IsOptional()
-  name?: string;
+  @IsNotEmpty()
+  name!: string;
 
   @IsString()
   @IsOptional()
