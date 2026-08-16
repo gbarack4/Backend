@@ -174,6 +174,20 @@ export class SchoolsController {
     return this.schoolSearchService.searchSchools(query, user.id);
   }
 
+  @Get('active')
+  @ApiOperation({ summary: 'Get actively joined schools for the current user' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Returns an array of schools the instructor has actively joined',
+  })
+  async getActiveSchools(
+    @CurrentUser() user: UserEntity,
+    @Query('q') q?: string,
+  ) {
+    return this.schoolSearchService.getActiveJoinedSchools(user.id, q);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a driving school by its unique identifier' })
   @ApiResponse({ status: 200, description: 'Returns school entity' })

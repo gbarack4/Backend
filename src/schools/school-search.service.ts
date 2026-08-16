@@ -168,4 +168,44 @@ export class SchoolSearchService {
       throw error;
     }
   }
+
+  async getActiveJoinedSchools(userId: string, q?: string) {
+    const conditions: SQL[] = [
+      eq(schema.instructors.userId, userId),
+      eq(schema.instructorSchools.status, 'accepted'),
+    ];
+
+    if (q && q.trim().length > 0) {
+      const escapedQuery = q.trim().replace(/[\\%_]/g, String.raw`\$&`);
+      conditions.push(ilike(schema.schools.name, `%${escapedQuery}%`));
+    }
+
+    const activeSchools = await this.db
+      .select({
+        id: schema.schools.id,
+        name: schema.schools.name,
+        logoUrl: schema.schools.logoUrl,
+        coverImageUrl: schema.schools.coverImageUrl,
+        status: schema.schools.status,
+        joinStatus: schema.instructorSchools.status,
+        address: schema.locations.addressLine1,
+        suburb: schema.locations.suburb,
+      })
+      .from(schema.instructorSchools)
+      .innerJoin(
+        schema.schools,
+        eq(schema.instructorSchools.schoolId, schema.schools.id),
+      )
+      .innerJoin(
+        schema.instructors,
+        eq(schema.instructorSchools.instructorId, schema.instructors.id),
+      )
+      .leftJoin(
+        schema.locations,
+        eq(schema.schools.id, schema.locations.schoolId),
+      )
+      .where(and(...conditions));
+
+    return activeSchools;
+  }
 }
