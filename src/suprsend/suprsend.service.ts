@@ -116,4 +116,61 @@ export class SuprSendService implements OnModuleInit {
       this.logger.error('Failed to trigger SuprSend notification', error);
     }
   }
+
+  async sendJoinRequestNotification(payload: {
+    recipientUserId: string;
+    recipientEmail: string;
+    schoolName: string;
+    instructorName: string;
+  }) {
+    if (!this.suprsendClient) {
+      this.logger.warn('SuprSend client is not initialized. Skipping event.');
+      return;
+    }
+
+    try {
+      try {
+        const user = this.suprsendClient.user.get_instance(
+          payload.recipientUserId,
+        );
+        user.add_email(payload.recipientEmail);
+        await user.save();
+      } catch (profileError) {
+        const errorMessage =
+          profileError instanceof Error
+            ? profileError.message
+            : String(profileError);
+
+        this.logger.warn(
+          `Failed to update SuprSend profile for ${payload.recipientUserId}: ${errorMessage}`,
+        );
+      }
+
+      const event = new SafeEvent(
+        payload.recipientUserId,
+        'JOIN_REQUEST_CREATED',
+        {
+          $email: [payload.recipientEmail],
+          instructor_name: payload.instructorName,
+          school_name: payload.schoolName,
+          category: 'JOIN_REQUEST',
+          event_name: 'JOIN_REQUEST_CREATED',
+          year: new Date().getFullYear(),
+        },
+      );
+
+      const response = await this.suprsendClient.track_event(event);
+
+      this.logger.log(
+        `SuprSend join request notification triggered for user: ${payload.recipientUserId}`,
+      );
+
+      return response;
+    } catch (error) {
+      this.logger.error(
+        'Failed to trigger SuprSend join request notification',
+        error,
+      );
+    }
+  }
 }

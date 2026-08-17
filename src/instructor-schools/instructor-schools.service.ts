@@ -18,12 +18,30 @@ export class InstructorSchoolsService {
 
   async createJoinRequest(userId: string, schoolId: string) {
     const [instructor] = await this.db
-      .select({ id: schema.instructors.id })
+      .select({
+        id: schema.instructors.id,
+        name: schema.instructors.name,
+      })
       .from(schema.instructors)
       .where(eq(schema.instructors.userId, userId));
 
     if (!instructor) {
       throw new NotFoundException('Instructor profile not found');
+    }
+
+    const [school] = await this.db
+      .select({
+        ownerUserId: schema.schools.ownerUserId,
+        name: schema.schools.name,
+        ownerEmail: schema.users.email,
+        clerkId: schema.users.clerkUserId,
+      })
+      .from(schema.schools)
+      .innerJoin(schema.users, eq(schema.schools.ownerUserId, schema.users.id))
+      .where(eq(schema.schools.id, schoolId));
+
+    if (!school) {
+      throw new NotFoundException('School not found');
     }
 
     const [result] = await this.db
@@ -50,6 +68,17 @@ export class InstructorSchoolsService {
       .returning();
 
     if (result) {
+      try {
+        await this.suprSendService.sendJoinRequestNotification({
+          recipientUserId: school.clerkId,
+          recipientEmail: school.ownerEmail,
+          schoolName: school.name,
+          instructorName: instructor.name || 'New Instructor',
+        });
+      } catch (error) {
+        console.error('[SuprSend] Failed to send join request event:', error);
+      }
+
       return result;
     }
 
