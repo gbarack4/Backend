@@ -25,6 +25,7 @@ export type SchoolGoogleData = {
   accessToken: string | null;
   refreshToken: string | null;
   locationName: string | null;
+  accountName: string | null;
   googleAccountId: string | null;
 };
 

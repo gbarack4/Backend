@@ -67,6 +67,7 @@ export class GoogleService {
         accessToken: schema.schools.googleAccessToken,
         refreshToken: schema.schools.googleRefreshToken,
         locationName: schema.schools.googleLocationName,
+        accountName: schema.schools.googleAccountName,
         googleAccountId: schema.schools.googleAccountId,
       })
       .from(schema.schools)
@@ -338,9 +339,9 @@ export class GoogleService {
       throw new NotFoundException('Google account not connected');
     }
 
-    if (!school.locationName) {
+    if (!school.locationName || !school.accountName) {
       throw new BadRequestException(
-        'Google Business Profile location is not selected',
+        'Google Business Profile location or account is not selected',
       );
     }
 
@@ -350,7 +351,10 @@ export class GoogleService {
       school.refreshToken,
       async (client) => {
         const reviewsRes = await client.request<GoogleReviewsResponse>({
-          url: GOOGLE_ENDPOINTS.REVIEWS(school.locationName!),
+          url: GOOGLE_ENDPOINTS.REVIEWS(
+            school.accountName!,
+            school.locationName!,
+          ),
         });
 
         return reviewsRes.data.reviews ?? [];
