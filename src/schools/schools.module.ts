@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { DatabaseModule } from '@/database/database.module';
 import { LocationModule } from '@/location/geocoding.module';
+import { UsersModule } from '@/users/users.module';
 
-import { DatabaseModule } from '../database/database.module';
-import { UsersModule } from '../users/users.module';
 import { SchoolMediaService } from './school-media.service';
 import { SchoolSearchService } from './school-search.service';
 import { SchoolSettingsService } from './school-settings.service';

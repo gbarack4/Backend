@@ -2,10 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 
-import * as schema from '../database/schema';
 import { WebsiteConfigDto } from './dto/website-config.dto';
 
 @Injectable()

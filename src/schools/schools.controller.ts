@@ -13,12 +13,13 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
-import { RequireDbUserGuard } from '../auth/guards/require-db-user.guard';
-import { SchoolRolesGuard } from '../auth/guards/school-roles.guard';
-import type { UserEntity } from '../auth/interfaces/auth.interface';
+import { CurrentUser } from '@/auth/decorators/current-user.decorator';
+import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
+import type { UserEntity } from '@/auth/interfaces/auth.interface';
+
 import { SearchSchoolsDto } from './dto/search-schools.dto';
 import { SetupSchoolDto } from './dto/setup-school.dto';
 import { UpdateSchoolCoverImageDto } from './dto/update-school-cover-image.dto';

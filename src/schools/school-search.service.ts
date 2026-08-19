@@ -2,10 +2,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, ilike, sql, SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 
-import * as schema from '../database/schema';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
 import { SchoolSearchResult } from './interfaces/school-search-result.interface';
 

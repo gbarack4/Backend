@@ -11,13 +11,13 @@ import { and, desc, eq, SQL, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import slugify from 'slugify';
 
+import * as schema from '@/database/schema';
 import { stripStreetNumber } from '@/common/utils/address.util';
 import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 import { GeocodingService } from '@/location/geocoding.service';
 import { GeocodeResult } from '@/location/types/geocoding.types';
 
-import * as schema from '../database/schema';
 import { APP_DOMAIN_SUFFIX } from './constants/school.constants';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 
