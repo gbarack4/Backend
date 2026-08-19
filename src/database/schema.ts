@@ -425,8 +425,11 @@ export const availability = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     instructorId: uuid('instructor_id').notNull(),
     dayOfWeek: integer('day_of_week').notNull(),
-    startTime: time('start_time').notNull(),
-    endTime: time('end_time').notNull(),
+    isWorking: boolean('is_working').default(true).notNull(),
+    startTime: time('start_time'),
+    endTime: time('end_time'),
+    slotInterval: integer('slot_interval').default(30).notNull(),
+    travelTime: integer('travel_time').default(15).notNull(),
     isRecurring: boolean('is_recurring').default(true).notNull(),
     createdAt: timestamp('created_at', {
       withTimezone: true,
@@ -443,6 +446,45 @@ export const availability = pgTable(
       'availability_day_of_week_check',
       sql`(day_of_week >= 0) AND (day_of_week <= 6)`,
     ),
+    unique('availability_instructor_day_key').on(
+      table.instructorId,
+      table.dayOfWeek,
+    ),
+  ],
+);
+
+export const availabilityLocations = pgTable(
+  'availability_locations',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    availabilityId: uuid('availability_id').notNull(),
+    suburb: text('suburb').notNull(),
+    postcode: text('postcode'),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.availabilityId],
+      foreignColumns: [availability.id],
+      name: 'availability_locations_availability_id_fkey',
+    }).onDelete('cascade'),
+  ],
+);
+
+export const availabilityBreaks = pgTable(
+  'availability_breaks',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    availabilityId: uuid('availability_id').notNull(),
+    startTime: time('start_time').notNull(),
+    endTime: time('end_time').notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.availabilityId],
+      foreignColumns: [availability.id],
+      name: 'availability_breaks_availability_id_fkey',
+    }).onDelete('cascade'),
+    check('availability_breaks_time_check', sql`end_time > start_time`),
   ],
 );
 

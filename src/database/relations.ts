@@ -22,6 +22,8 @@ import {
   coupons,
   payments,
   activityLogs,
+  availabilityLocations,
+  availabilityBreaks,
 } from './schema';
 
 export const instructorSchoolsRelations = relations(
@@ -113,12 +115,37 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
   reviews: many(reviews),
 }));
 
-export const availabilityRelations = relations(availability, ({ one }) => ({
-  instructor: one(instructors, {
-    fields: [availability.instructorId],
-    references: [instructors.id],
+export const availabilityRelations = relations(
+  availability,
+  ({ one, many }) => ({
+    instructor: one(instructors, {
+      fields: [availability.instructorId],
+      references: [instructors.id],
+    }),
+    locations: many(availabilityLocations),
+    breaks: many(availabilityBreaks),
   }),
-}));
+);
+
+export const availabilityLocationsRelations = relations(
+  availabilityLocations,
+  ({ one }) => ({
+    availability: one(availability, {
+      fields: [availabilityLocations.availabilityId],
+      references: [availability.id],
+    }),
+  }),
+);
+
+export const availabilityBreaksRelations = relations(
+  availabilityBreaks,
+  ({ one }) => ({
+    availability: one(availability, {
+      fields: [availabilityBreaks.availabilityId],
+      references: [availability.id],
+    }),
+  }),
+);
 
 export const availabilityBlocksRelations = relations(
   availabilityBlocks,
