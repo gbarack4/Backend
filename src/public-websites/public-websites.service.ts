@@ -1,15 +1,15 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { Inject, Injectable } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import { DB_CONNECTION } from '@/database/database.module';
+
 import * as schema from '../database/schema';
 import { WebsiteConfigDto } from './dto/website-config.dto';
-import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class PublicWebsitesService {
-  constructor(
-    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
-  ) {}
+  constructor(@Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>) {}
 
   async findByDomain(domain: string): Promise<WebsiteConfigDto | null> {
     const [record] = await this.db
@@ -22,14 +22,8 @@ export class PublicWebsitesService {
         customConfig: schema.schoolWebsites.config,
       })
       .from(schema.schoolDomains)
-      .innerJoin(
-        schema.schools,
-        eq(schema.schoolDomains.schoolId, schema.schools.id),
-      )
-      .innerJoin(
-        schema.schoolWebsites,
-        eq(schema.schools.id, schema.schoolWebsites.schoolId),
-      )
+      .innerJoin(schema.schools, eq(schema.schoolDomains.schoolId, schema.schools.id))
+      .innerJoin(schema.schoolWebsites, eq(schema.schools.id, schema.schoolWebsites.schoolId))
       .innerJoin(
         schema.websiteTemplates,
         eq(schema.schoolWebsites.templateId, schema.websiteTemplates.id),

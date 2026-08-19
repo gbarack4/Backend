@@ -1,5 +1,3 @@
-import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
-import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import {
   Body,
   Controller,
@@ -11,10 +9,14 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { InstructorSchoolsService } from './instructor-schools.service';
-import type { UserEntity } from '@/auth/interfaces/auth.interface';
+
 import { CurrentUser } from '@/auth/decorators/current-user.decorator';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import type { UserEntity } from '@/auth/interfaces/auth.interface';
+
 import { CreateJoinRequestDto } from './dto/create-join-request.dto';
+import { InstructorSchoolsService } from './instructor-schools.service';
 
 @Controller('instructor')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
@@ -22,10 +24,7 @@ export class InstructorController {
   constructor(private readonly service: InstructorSchoolsService) {}
 
   @Post('requests')
-  async createRequest(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: CreateJoinRequestDto,
-  ) {
+  async createRequest(@CurrentUser() user: UserEntity, @Body() dto: CreateJoinRequestDto) {
     return this.service.createJoinRequest(user.id, dto.schoolId);
   }
 
@@ -43,10 +42,7 @@ export class InstructorController {
   }
 
   @Get('invites/:id')
-  async getInviteById(
-    @CurrentUser() user: UserEntity,
-    @Param('id') inviteId: string,
-  ) {
+  async getInviteById(@CurrentUser() user: UserEntity, @Param('id') inviteId: string) {
     return this.service.getSchoolInviteById(user.id, inviteId);
   }
 

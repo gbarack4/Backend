@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { AvailabilityService } from './availability.service';
+
 import { AvailabilityController } from './availability.controller';
+import { AvailabilityService } from './availability.service';
 
 @Module({
   providers: [AvailabilityService],

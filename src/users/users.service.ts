@@ -1,16 +1,18 @@
 import {
-  Injectable,
-  Inject,
-  NotFoundException,
-  Logger,
-  InternalServerErrorException,
   HttpException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
-import { DB_CONNECTION } from '@/database/database.module';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, sql } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import * as schema from '@/database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
 import { S3Service } from '@/storage/s3.service';
+
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
@@ -143,9 +145,7 @@ export class UsersService {
       await this.s3Service.deleteFile(avatarUrl);
     } catch (err) {
       const warnMessage = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `Failed to delete old avatar: ${avatarUrl}. ${warnMessage}`,
-      );
+      this.logger.warn(`Failed to delete old avatar: ${avatarUrl}. ${warnMessage}`);
     }
   }
 
@@ -165,10 +165,7 @@ export class UsersService {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    this.logger.error(
-      `Avatar update failed for user ${userId}: ${errorMessage}`,
-      errorStack,
-    );
+    this.logger.error(`Avatar update failed for user ${userId}: ${errorMessage}`, errorStack);
 
     throw new InternalServerErrorException('Failed to process avatar upload');
   }

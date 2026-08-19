@@ -1,9 +1,11 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import { DB_CONNECTION } from '@/database/database.module';
+
 import * as schema from '../database/schema';
 import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto';
-import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class AvailabilityService {
@@ -22,10 +24,7 @@ export class AvailabilityService {
     });
   }
 
-  async updateDailyAvailability(
-    instructorId: string,
-    dto: UpdateDailyAvailabilityDto,
-  ) {
+  async updateDailyAvailability(instructorId: string, dto: UpdateDailyAvailabilityDto) {
     return await this.db.transaction(async (tx) => {
       const [availabilityRecord] = await tx
         .insert(schema.availability)
@@ -39,10 +38,7 @@ export class AvailabilityService {
           travelTime: dto.travelTime,
         })
         .onConflictDoUpdate({
-          target: [
-            schema.availability.instructorId,
-            schema.availability.dayOfWeek,
-          ],
+          target: [schema.availability.instructorId, schema.availability.dayOfWeek],
           set: {
             isWorking: dto.isWorking,
             startTime: dto.isWorking ? dto.startTime : null,

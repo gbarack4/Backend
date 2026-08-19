@@ -1,30 +1,30 @@
 import {
-  Injectable,
-  Inject,
-  Logger,
-  ConflictException,
   BadRequestException,
+  ConflictException,
   HttpException,
+  Inject,
+  Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, sql } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import slugify from 'slugify';
+
+import { stripStreetNumber } from '@/common/utils/address.util';
+import { DB_CONNECTION } from '@/database/database.module';
+import { GeocodingService } from '@/location/geocoding.service';
+
 import * as schema from '../database/schema';
-import { SetupSchoolDto } from './dto/setup-school.dto';
 import {
   DEFAULT_LOCATION_NAME,
   DEFAULT_TEMPLATE_NAME,
-  TRIAL_DURATION_DAYS,
   MAX_SLUG_ATTEMPTS,
+  TRIAL_DURATION_DAYS,
 } from './constants/school.constants';
-import { GeocodingService } from '@/location/geocoding.service';
-import { stripStreetNumber } from '@/common/utils/address.util';
-import { DB_CONNECTION } from '@/database/database.module';
+import { SetupSchoolDto } from './dto/setup-school.dto';
 
-function isPostgresError(
-  error: unknown,
-): error is { code: string; constraint?: string } {
+function isPostgresError(error: unknown): error is { code: string; constraint?: string } {
   return typeof error === 'object' && error !== null && 'code' in error;
 }
 
@@ -41,9 +41,7 @@ export class SchoolSetupService {
     const baseSlug = slugify(name, { lower: true, strict: true });
 
     if (!baseSlug) {
-      throw new BadRequestException(
-        'School name contains invalid characters for URL',
-      );
+      throw new BadRequestException('School name contains invalid characters for URL');
     }
 
     for (let counter = 1; counter <= MAX_SLUG_ATTEMPTS; counter++) {
@@ -89,10 +87,7 @@ export class SchoolSetupService {
 
     const [geoResult, publicGeoResult] = await Promise.all([
       this.geocodingService.getCoordinatesFromAddress(fullAddress, 'au'),
-      this.geocodingService.getCoordinatesFromAddress(
-        publicAddressForGeo,
-        'au',
-      ),
+      this.geocodingService.getCoordinatesFromAddress(publicAddressForGeo, 'au'),
     ]);
 
     if (geoResult.status === 'error') {
@@ -100,9 +95,7 @@ export class SchoolSetupService {
         `Geocoding failed for user ${userId}, proceeding without exact coordinates: ${geoResult.message}`,
       );
     } else if (geoResult.status === 'not_found') {
-      this.logger.warn(
-        `Exact address not found for user ${userId}: ${fullAddress}`,
-      );
+      this.logger.warn(`Exact address not found for user ${userId}: ${fullAddress}`);
     }
 
     if (publicGeoResult.status === 'error') {
@@ -110,9 +103,7 @@ export class SchoolSetupService {
         `Public geocoding failed for user ${userId}, proceeding without public coordinates: ${publicGeoResult.message}`,
       );
     } else if (publicGeoResult.status === 'not_found') {
-      this.logger.warn(
-        `Public address not found for user ${userId}: ${publicAddressForGeo}`,
-      );
+      this.logger.warn(`Public address not found for user ${userId}: ${publicAddressForGeo}`);
     }
 
     try {
@@ -203,9 +194,7 @@ export class SchoolSetupService {
       if (isPostgresError(error) && error.code === '23505') {
         switch (error.constraint) {
           case 'schools_slug_key':
-            throw new ConflictException(
-              'School slug already exists. Please try a different name.',
-            );
+            throw new ConflictException('School slug already exists. Please try a different name.');
           case 'school_domains_domain_key':
             throw new ConflictException('This domain is already taken.');
           default:

@@ -1,10 +1,11 @@
-import { Global, Module, Logger } from '@nestjs/common';
+import * as path from 'node:path';
+import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+
 import * as schema from './schema';
-import * as path from 'node:path';
 
 export const DB_CONNECTION = 'DB_CONNECTION' as const;
 
@@ -26,8 +27,7 @@ export const DB_CONNECTION = 'DB_CONNECTION' as const;
         }
 
         const isLocal =
-          connectionString.includes('localhost') ||
-          connectionString.includes('127.0.0.1');
+          connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 
         const pool = new Pool({
           connectionString,

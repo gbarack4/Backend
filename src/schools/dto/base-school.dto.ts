@@ -1,26 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsString,
   IsEmail,
-  IsOptional,
-  MinLength,
-  MaxLength,
-  IsNotEmpty,
   IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
   Matches,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
 
 import {
-  BUSINESS_CATEGORIES,
   AUSTRALIAN_STATES,
+  BUSINESS_CATEGORIES,
   DATE_FORMAT_OPTIONS,
   TIME_FORMAT_OPTIONS,
 } from '../constants/school.constants';
 
 export class BaseSchoolDto {
   @ApiProperty({
-    description:
-      'The registered legal or commercial name of the driving school',
+    description: 'The registered legal or commercial name of the driving school',
     example: 'Apex Driving Academy',
     minLength: 2,
   })
@@ -54,8 +53,7 @@ export class BaseSchoolDto {
   category!: string;
 
   @ApiProperty({
-    description:
-      'Detailed public description of the school, its mission, or services',
+    description: 'Detailed public description of the school, its mission, or services',
     example:
       'Providing premium, high-quality automatic and manual driving lessons across Brisbane.',
     maxLength: 500,
@@ -108,8 +106,7 @@ export class BaseSchoolDto {
   postcode!: string;
 
   @ApiProperty({
-    description:
-      'The operational timezone ID according to IANA timezone database standard',
+    description: 'The operational timezone ID according to IANA timezone database standard',
     example: 'Australia/Brisbane',
   })
   @IsString()
@@ -135,8 +132,7 @@ export class BaseSchoolDto {
   timeFormat!: string;
 
   @ApiProperty({
-    description:
-      'Current operational state workflow status of the school system entity',
+    description: 'Current operational state workflow status of the school system entity',
     enum: ['onboarding', 'active', 'suspended'],
     example: 'active',
   })

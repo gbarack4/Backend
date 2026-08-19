@@ -1,26 +1,21 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, ilike, sql, SQL } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import { DB_CONNECTION } from '@/database/database.module';
+
 import * as schema from '../database/schema';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
 import { SchoolSearchResult } from './interfaces/school-search-result.interface';
-import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class SchoolSearchService {
   private readonly logger = new Logger(SchoolSearchService.name);
 
-  constructor(
-    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
-  ) {}
+  constructor(@Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>) {}
 
-  async searchSchools(
-    query: SearchSchoolsDto,
-    userId?: string,
-  ): Promise<SchoolSearchResult[]> {
-    this.logger.debug(
-      `Searching schools with params: ${JSON.stringify(query)}`,
-    );
+  async searchSchools(query: SearchSchoolsDto, userId?: string): Promise<SchoolSearchResult[]> {
+    this.logger.debug(`Searching schools with params: ${JSON.stringify(query)}`);
 
     let actualInstructorId: string | null = null;
     if (userId) {
@@ -88,21 +83,13 @@ export class SchoolSearchService {
         this.db
           .select({
             schoolId: schema.instructorSchools.schoolId,
-            rating:
-              sql<number>`ROUND(AVG(${schema.reviews.rating})::numeric, 1)`.as(
-                'rating',
-              ),
-            reviewCount: sql<number>`COUNT(${schema.reviews.id})::int`.as(
-              'reviewCount',
-            ),
+            rating: sql<number>`ROUND(AVG(${schema.reviews.rating})::numeric, 1)`.as('rating'),
+            reviewCount: sql<number>`COUNT(${schema.reviews.id})::int`.as('reviewCount'),
           })
           .from(schema.reviews)
           .innerJoin(
             schema.instructorSchools,
-            eq(
-              schema.instructorSchools.instructorId,
-              schema.reviews.instructorId,
-            ),
+            eq(schema.instructorSchools.instructorId, schema.reviews.instructorId),
           )
           .groupBy(schema.instructorSchools.schoolId),
       );
@@ -120,12 +107,8 @@ export class SchoolSearchService {
 
           suburb: schema.locations.suburb,
           postcode: schema.locations.postcode,
-          longitude: sql<
-            number | null
-          >`ST_X(${schema.locations.publicCoordinates}::geometry)`,
-          latitude: sql<
-            number | null
-          >`ST_Y(${schema.locations.publicCoordinates}::geometry)`,
+          longitude: sql<number | null>`ST_X(${schema.locations.publicCoordinates}::geometry)`,
+          latitude: sql<number | null>`ST_Y(${schema.locations.publicCoordinates}::geometry)`,
           distance:
             query.originLat !== undefined && query.originLng !== undefined
               ? sql<number | null>`CAST(ST_Distance(
@@ -145,10 +128,7 @@ export class SchoolSearchService {
             : sql<string>`'none'`,
         })
         .from(schema.schools)
-        .leftJoin(
-          schema.locations,
-          eq(schema.locations.schoolId, schema.schools.id),
-        )
+        .leftJoin(schema.locations, eq(schema.locations.schoolId, schema.schools.id))
         .leftJoin(schoolStats, eq(schema.schools.id, schoolStats.schoolId))
         .where(and(...conditions))
         .orderBy(sortingExpression)
@@ -159,10 +139,7 @@ export class SchoolSearchService {
         ...school,
         rating: Number(school.rating),
         reviewCount: Number(school.reviewCount),
-        distance:
-          school.distance !== null
-            ? Math.round(Number(school.distance) * 10) / 10
-            : null,
+        distance: school.distance !== null ? Math.round(Number(school.distance) * 10) / 10 : null,
       }));
     } catch (error) {
       this.logger.error('Failed to search schools', error);
@@ -193,18 +170,12 @@ export class SchoolSearchService {
         suburb: schema.locations.suburb,
       })
       .from(schema.instructorSchools)
-      .innerJoin(
-        schema.schools,
-        eq(schema.instructorSchools.schoolId, schema.schools.id),
-      )
+      .innerJoin(schema.schools, eq(schema.instructorSchools.schoolId, schema.schools.id))
       .innerJoin(
         schema.instructors,
         eq(schema.instructorSchools.instructorId, schema.instructors.id),
       )
-      .leftJoin(
-        schema.locations,
-        eq(schema.schools.id, schema.locations.schoolId),
-      )
+      .leftJoin(schema.locations, eq(schema.schools.id, schema.locations.schoolId))
       .where(and(...conditions));
 
     return activeSchools;

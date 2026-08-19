@@ -1,21 +1,14 @@
 import {
+  Body,
   Controller,
   Get,
-  UseGuards,
-  Post,
-  UseInterceptors,
-  UploadedFile,
   Patch,
-  Body,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { CurrentUser } from '@/auth/decorators/current-user.decorator';
-import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import type { UserEntity } from '@/auth/interfaces/auth.interface';
-import { fileValidationPipe } from '@/storage/constants/storage.constants';
-import { UsersService } from './users.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -24,6 +17,15 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+
+import { CurrentUser } from '@/auth/decorators/current-user.decorator';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import type { UserEntity } from '@/auth/interfaces/auth.interface';
+import { fileValidationPipe } from '@/storage/constants/storage.constants';
+
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UsersService } from './users.service';
 
 @ApiTags('Users & Profile')
 @ApiBearerAuth()
@@ -42,10 +44,7 @@ export class UsersController {
   @Patch('profile')
   @ApiOperation({ summary: 'Update user profile details' })
   @ApiResponse({ status: 200, description: 'Profile successfully updated' })
-  async updateProfile(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  async updateProfile(@CurrentUser() user: UserEntity, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(user.id, dto);
   }
 

@@ -1,22 +1,22 @@
+import { sql } from 'drizzle-orm';
 import {
-  pgTable,
-  foreignKey,
-  unique,
+  boolean,
   check,
-  uuid,
-  text,
-  timestamp,
-  pgPolicy,
-  numeric,
+  date,
+  foreignKey,
+  geometry,
   index,
   integer,
-  time,
-  boolean,
   jsonb,
-  date,
-  geometry,
+  numeric,
+  pgPolicy,
+  pgTable,
+  text,
+  time,
+  timestamp,
+  unique,
+  uuid,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 
 export const instructorSchools = pgTable(
   'instructor_schools',
@@ -46,10 +46,7 @@ export const instructorSchools = pgTable(
       foreignColumns: [schools.id],
       name: 'instructor_schools_school_id_fkey',
     }).onDelete('cascade'),
-    unique('instructor_schools_instructor_id_school_id_key').on(
-      table.instructorId,
-      table.schoolId,
-    ),
+    unique('instructor_schools_instructor_id_school_id_key').on(table.instructorId, table.schoolId),
     check(
       'instructor_schools_status_check',
       sql`status = ANY (ARRAY['pending'::text, 'accepted'::text, 'rejected'::text, 'blocked'::text, 'paused'::text])`,
@@ -140,9 +137,7 @@ export const schools = pgTable(
     timezone: text().default('UTC').notNull(),
     dateFormat: text('date_format').default('DD/MM/YYYY').notNull(),
     timeFormat: text('time_format').default('24h').notNull(),
-    subscriptionStatus: text('subscription_status')
-      .default('trialing')
-      .notNull(),
+    subscriptionStatus: text('subscription_status').default('trialing').notNull(),
     trialEndsAt: timestamp('trial_ends_at', {
       withTimezone: true,
       mode: 'string',
@@ -245,10 +240,7 @@ export const schoolUsers = pgTable(
       foreignColumns: [schools.id],
       name: 'school_users_school_id_fkey',
     }).onDelete('cascade'),
-    unique('school_users_user_id_school_id_key').on(
-      table.userId,
-      table.schoolId,
-    ),
+    unique('school_users_user_id_school_id_key').on(table.userId, table.schoolId),
     pgPolicy('isolate_school_users', {
       as: 'permissive',
       for: 'all',
@@ -286,10 +278,7 @@ export const students = pgTable(
     }).defaultNow(),
   },
   (table) => [
-    index('idx_students_school_id').using(
-      'btree',
-      table.schoolId.asc().nullsLast().op('uuid_ops'),
-    ),
+    index('idx_students_school_id').using('btree', table.schoolId.asc().nullsLast().op('uuid_ops')),
     foreignKey({
       columns: [table.schoolId],
       foreignColumns: [schools.id],
@@ -347,10 +336,7 @@ export const instructors = pgTable(
       name: 'instructors_user_id_fkey',
     }).onDelete('cascade'),
     unique('instructors_user_id_key').on(table.userId),
-    check(
-      'instructors_status_check',
-      sql`status = ANY (ARRAY['active'::text, 'inactive'::text])`,
-    ),
+    check('instructors_status_check', sql`status = ANY (ARRAY['active'::text, 'inactive'::text])`),
   ],
 ).enableRLS();
 
@@ -376,10 +362,7 @@ export const cars = pgTable(
     }).defaultNow(),
   },
   (table) => [
-    index('idx_cars_school_id').using(
-      'btree',
-      table.schoolId.asc().nullsLast().op('uuid_ops'),
-    ),
+    index('idx_cars_school_id').using('btree', table.schoolId.asc().nullsLast().op('uuid_ops')),
     index('idx_cars_instructor_id').using(
       'btree',
       table.instructorId.asc().nullsLast().op('uuid_ops'),
@@ -412,10 +395,7 @@ export const cars = pgTable(
       'cars_status_check',
       sql`status = ANY (ARRAY['active'::text, 'maintenance'::text, 'retired'::text])`,
     ),
-    check(
-      'cars_year_check',
-      sql`year >= 1990 AND year <= extract(year from now())::int + 1`,
-    ),
+    check('cars_year_check', sql`year >= 1990 AND year <= extract(year from now())::int + 1`),
   ],
 ).enableRLS();
 
@@ -442,14 +422,8 @@ export const availability = pgTable(
       foreignColumns: [instructors.id],
       name: 'availability_instructor_id_fkey',
     }).onDelete('cascade'),
-    check(
-      'availability_day_of_week_check',
-      sql`(day_of_week >= 0) AND (day_of_week <= 6)`,
-    ),
-    unique('availability_instructor_day_key').on(
-      table.instructorId,
-      table.dayOfWeek,
-    ),
+    check('availability_day_of_week_check', sql`(day_of_week >= 0) AND (day_of_week <= 6)`),
+    unique('availability_instructor_day_key').on(table.instructorId, table.dayOfWeek),
   ],
 );
 
@@ -568,10 +542,7 @@ export const bookings = pgTable(
       'btree',
       table.instructorId.asc().nullsLast().op('uuid_ops'),
     ),
-    index('idx_bookings_school_id').using(
-      'btree',
-      table.schoolId.asc().nullsLast().op('uuid_ops'),
-    ),
+    index('idx_bookings_school_id').using('btree', table.schoolId.asc().nullsLast().op('uuid_ops')),
     foreignKey({
       columns: [table.schoolId],
       foreignColumns: [schools.id],
@@ -761,10 +732,7 @@ export const notifications = pgTable(
       foreignColumns: [users.id],
       name: 'notifications_user_id_fkey',
     }).onDelete('cascade'),
-    check(
-      'notifications_status_check',
-      sql`status = ANY (ARRAY['unread'::text, 'read'::text])`,
-    ),
+    check('notifications_status_check', sql`status = ANY (ARRAY['unread'::text, 'read'::text])`),
   ],
 );
 
@@ -943,10 +911,7 @@ export const schoolDomains = pgTable(
       foreignColumns: [schools.id],
       name: 'school_domains_school_id_fkey',
     }).onDelete('cascade'),
-    check(
-      'school_domains_type_check',
-      sql`type = ANY (ARRAY['subdomain'::text, 'custom'::text])`,
-    ),
+    check('school_domains_type_check', sql`type = ANY (ARRAY['subdomain'::text, 'custom'::text])`),
 
     pgPolicy('isolate_school_domains', {
       as: 'permissive',
@@ -1006,16 +971,11 @@ export const schoolWebsites = pgTable(
   ],
 ).enableRLS();
 
-export const instructorOnboardingDrafts = pgTable(
-  'instructor_onboarding_drafts',
-  {
-    clerkUserId: text('clerk_user_id')
-      .primaryKey()
-      .references(() => users.clerkUserId, { onDelete: 'cascade' }),
-    currentStepIndex: integer('current_step_index').notNull().default(0),
-    formData: jsonb('form_data').notNull().default({}),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-);
+export const instructorOnboardingDrafts = pgTable('instructor_onboarding_drafts', {
+  clerkUserId: text('clerk_user_id')
+    .primaryKey()
+    .references(() => users.clerkUserId, { onDelete: 'cascade' }),
+  currentStepIndex: integer('current_step_index').notNull().default(0),
+  formData: jsonb('form_data').notNull().default({}),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

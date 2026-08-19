@@ -1,5 +1,5 @@
-import { IsString, IsOptional, ValidateNested, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 class AddressDto {
   @IsString()

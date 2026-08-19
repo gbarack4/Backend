@@ -1,13 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import helmet from 'helmet';
 
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '@/database/schema';
-import { eq } from 'drizzle-orm';
 import { DB_CONNECTION } from '@/database/database.module';
+
+import { AppModule } from './app.module';
 import { TrimPipe } from './common/pipes/trim.pipe';
 
 const logger = new Logger('Bootstrap');
@@ -92,9 +93,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
-    logger: isProd
-      ? ['error', 'warn', 'log']
-      : ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: isProd ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
   app.use(helmet());

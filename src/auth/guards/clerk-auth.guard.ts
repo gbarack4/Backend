@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+
 import { ClerkAuthService } from '../clerk-auth.service';
 import { RequestWithAuth } from '../interfaces/auth.interface';
 

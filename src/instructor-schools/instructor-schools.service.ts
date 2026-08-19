@@ -1,14 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  Inject,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, desc, inArray, sql } from 'drizzle-orm';
-import * as schema from '../database/schema';
-import { SuprSendService } from '@/suprsend/suprsend.service';
+
 import { DB_CONNECTION } from '@/database/database.module';
+import { SuprSendService } from '@/suprsend/suprsend.service';
+
+import * as schema from '../database/schema';
 
 @Injectable()
 export class InstructorSchoolsService {
@@ -54,10 +51,7 @@ export class InstructorSchoolsService {
         source: 'instructor_request',
       })
       .onConflictDoUpdate({
-        target: [
-          schema.instructorSchools.instructorId,
-          schema.instructorSchools.schoolId,
-        ],
+        target: [schema.instructorSchools.instructorId, schema.instructorSchools.schoolId],
         set: {
           status: 'pending',
           source: 'instructor_request',
@@ -97,17 +91,13 @@ export class InstructorSchoolsService {
       case 'accepted':
         throw new ConflictException('You are already a member of this school');
       case 'pending':
-        throw new ConflictException(
-          'You already have a pending request to this school',
-        );
+        throw new ConflictException('You already have a pending request to this school');
       case 'blocked':
         throw new ConflictException(
           'You have been blocked from this school. Please contact the school.',
         );
       case 'paused':
-        throw new ConflictException(
-          'Your membership with this school is currently paused',
-        );
+        throw new ConflictException('Your membership with this school is currently paused');
       default:
         throw new ConflictException('Unable to process join request');
     }
@@ -119,10 +109,7 @@ export class InstructorSchoolsService {
   ) {
     const conditions = [
       eq(schema.instructorSchools.schoolId, schoolId),
-      inArray(schema.instructorSchools.source, [
-        'instructor_request',
-        'school_invite',
-      ]),
+      inArray(schema.instructorSchools.source, ['instructor_request', 'school_invite']),
     ];
 
     if (status) {
@@ -163,17 +150,12 @@ export class InstructorSchoolsService {
         respondedAt: new Date().toISOString(),
       })
       .where(
-        and(
-          eq(schema.instructorSchools.id, id),
-          eq(schema.instructorSchools.status, 'pending'),
-        ),
+        and(eq(schema.instructorSchools.id, id), eq(schema.instructorSchools.status, 'pending')),
       )
       .returning();
 
     if (!updated) {
-      throw new NotFoundException(
-        'Join request not found or already processed',
-      );
+      throw new NotFoundException('Join request not found or already processed');
     }
 
     return updated;
@@ -192,9 +174,7 @@ export class InstructorSchoolsService {
         .where(eq(schema.users.email, email));
 
       if (!user) {
-        throw new NotFoundException(
-          'User with this email is not registered on the platform',
-        );
+        throw new NotFoundException('User with this email is not registered on the platform');
       }
 
       const [instructorData] = await this.db
@@ -225,21 +205,13 @@ export class InstructorSchoolsService {
           ownerEmail: schema.users.email,
         })
         .from(schema.schools)
-        .innerJoin(
-          schema.users,
-          eq(schema.schools.ownerUserId, schema.users.id),
-        )
+        .innerJoin(schema.users, eq(schema.schools.ownerUserId, schema.users.id))
         .where(eq(schema.schools.id, schoolId));
       if (schoolData) {
         const resolvedEmail =
-          schoolData.email ??
-          schoolData.ownerEmail ??
-          'noreply@driveinstructor.pro';
+          schoolData.email ?? schoolData.ownerEmail ?? 'noreply@driveinstructor.pro';
 
-        const expiryDays = Number.parseInt(
-          process.env.INVITE_EXPIRY_DAYS || '7',
-          10,
-        );
+        const expiryDays = Number.parseInt(process.env.INVITE_EXPIRY_DAYS || '7', 10);
 
         const baseUrl = process.env.INSTRUCTOR_APP_URL;
         const inviteUrl = `${baseUrl}/invite?id=${invite.id}`;
@@ -261,9 +233,7 @@ export class InstructorSchoolsService {
     } catch (error) {
       const dbError = error as { code?: string };
       if (dbError.code === '23505') {
-        throw new ConflictException(
-          'A request or invite already exists for this instructor',
-        );
+        throw new ConflictException('A request or invite already exists for this instructor');
       }
       throw error;
     }
@@ -292,10 +262,7 @@ export class InstructorSchoolsService {
         },
       })
       .from(schema.instructorSchools)
-      .innerJoin(
-        schema.schools,
-        eq(schema.instructorSchools.schoolId, schema.schools.id),
-      )
+      .innerJoin(schema.schools, eq(schema.instructorSchools.schoolId, schema.schools.id))
       .where(
         and(
           eq(schema.instructorSchools.instructorId, instructor.id),
@@ -305,11 +272,7 @@ export class InstructorSchoolsService {
       );
   }
 
-  async respondToInvite(
-    userId: string,
-    inviteId: string,
-    status: 'accepted' | 'rejected',
-  ) {
+  async respondToInvite(userId: string, inviteId: string, status: 'accepted' | 'rejected') {
     const [instructor] = await this.db
       .select({ id: schema.instructors.id })
       .from(schema.instructors)
@@ -553,15 +516,9 @@ export class InstructorSchoolsService {
         },
       })
       .from(schema.instructorSchools)
-      .innerJoin(
-        schema.schools,
-        eq(schema.instructorSchools.schoolId, schema.schools.id),
-      )
+      .innerJoin(schema.schools, eq(schema.instructorSchools.schoolId, schema.schools.id))
       .innerJoin(schema.users, eq(schema.schools.ownerUserId, schema.users.id))
-      .innerJoin(
-        schema.locations,
-        eq(schema.schools.id, schema.locations.schoolId),
-      )
+      .innerJoin(schema.locations, eq(schema.schools.id, schema.locations.schoolId))
       .where(
         and(
           eq(schema.instructorSchools.id, inviteId),

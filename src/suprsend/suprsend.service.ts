@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Suprsend, Event } from '@suprsend/node-sdk';
+import { Event, Suprsend } from '@suprsend/node-sdk';
 
 interface ISuprsendEvent {
   distinct_id: string;
@@ -24,10 +24,7 @@ interface ISuprsendClient {
   };
 }
 
-const SafeSuprsend = Suprsend as unknown as new (
-  key: string,
-  secret: string,
-) => ISuprsendClient;
+const SafeSuprsend = Suprsend as unknown as new (key: string, secret: string) => ISuprsendClient;
 
 const SafeEvent = Event as unknown as new (
   distinct_id: string,
@@ -46,9 +43,7 @@ export class SuprSendService implements OnModuleInit {
     const apiSecret = process.env.SUPRSEND_WORKSPACE_SECRET;
 
     if (!apiKey || !apiSecret) {
-      this.logger.warn(
-        'SuprSend credentials are missing in environment variables!',
-      );
+      this.logger.warn('SuprSend credentials are missing in environment variables!');
       return;
     }
 
@@ -73,37 +68,29 @@ export class SuprSendService implements OnModuleInit {
 
     try {
       try {
-        const user = this.suprsendClient.user.get_instance(
-          payload.recipientEmail,
-        );
+        const user = this.suprsendClient.user.get_instance(payload.recipientEmail);
         user.add_email(payload.recipientEmail);
         await user.save();
       } catch (profileError) {
         const errorMessage =
-          profileError instanceof Error
-            ? profileError.message
-            : String(profileError);
+          profileError instanceof Error ? profileError.message : String(profileError);
 
         this.logger.warn(
           `Failed to update SuprSend profile for ${payload.recipientEmail}: ${errorMessage}`,
         );
       }
 
-      const event = new SafeEvent(
-        payload.recipientEmail,
-        'SCHOOL_INVITE_CREATED',
-        {
-          $email: [payload.recipientEmail],
-          school_name: payload.schoolName,
-          school_email: payload.schoolEmail,
-          instructor_name: payload.instructorName,
-          invite_url: payload.inviteUrl,
-          invite_id: payload.inviteId,
-          custom_message: payload.customMessage,
-          expiry_days: payload.expiryDays,
-          year: new Date().getFullYear(),
-        },
-      );
+      const event = new SafeEvent(payload.recipientEmail, 'SCHOOL_INVITE_CREATED', {
+        $email: [payload.recipientEmail],
+        school_name: payload.schoolName,
+        school_email: payload.schoolEmail,
+        instructor_name: payload.instructorName,
+        invite_url: payload.inviteUrl,
+        invite_id: payload.inviteId,
+        custom_message: payload.customMessage,
+        expiry_days: payload.expiryDays,
+        year: new Date().getFullYear(),
+      });
 
       const response = await this.suprsendClient.track_event(event);
 
@@ -130,34 +117,26 @@ export class SuprSendService implements OnModuleInit {
 
     try {
       try {
-        const user = this.suprsendClient.user.get_instance(
-          payload.recipientUserId,
-        );
+        const user = this.suprsendClient.user.get_instance(payload.recipientUserId);
         user.add_email(payload.recipientEmail);
         await user.save();
       } catch (profileError) {
         const errorMessage =
-          profileError instanceof Error
-            ? profileError.message
-            : String(profileError);
+          profileError instanceof Error ? profileError.message : String(profileError);
 
         this.logger.warn(
           `Failed to update SuprSend profile for ${payload.recipientUserId}: ${errorMessage}`,
         );
       }
 
-      const event = new SafeEvent(
-        payload.recipientUserId,
-        'JOIN_REQUEST_CREATED',
-        {
-          $email: [payload.recipientEmail],
-          instructor_name: payload.instructorName,
-          school_name: payload.schoolName,
-          category: 'JOIN_REQUEST',
-          event_name: 'JOIN_REQUEST_CREATED',
-          year: new Date().getFullYear(),
-        },
-      );
+      const event = new SafeEvent(payload.recipientUserId, 'JOIN_REQUEST_CREATED', {
+        $email: [payload.recipientEmail],
+        instructor_name: payload.instructorName,
+        school_name: payload.schoolName,
+        category: 'JOIN_REQUEST',
+        event_name: 'JOIN_REQUEST_CREATED',
+        year: new Date().getFullYear(),
+      });
 
       const response = await this.suprsendClient.track_event(event);
 
@@ -167,10 +146,7 @@ export class SuprSendService implements OnModuleInit {
 
       return response;
     } catch (error) {
-      this.logger.error(
-        'Failed to trigger SuprSend join request notification',
-        error,
-      );
+      this.logger.error('Failed to trigger SuprSend join request notification', error);
     }
   }
 }

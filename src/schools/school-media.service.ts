@@ -1,16 +1,18 @@
 import {
-  Injectable,
+  HttpException,
   Inject,
+  Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
-  HttpException,
-  InternalServerErrorException,
 } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import { DB_CONNECTION } from '@/database/database.module';
+
 import * as schema from '../database/schema';
 import { S3Service } from '../storage/s3.service';
-import { DB_CONNECTION } from '@/database/database.module';
 
 type SchoolImageField = 'logoUrl' | 'coverImageUrl';
 
@@ -28,12 +30,7 @@ export class SchoolMediaService {
   }
 
   async updateSchoolCoverImage(schoolId: string, newCoverImageUrl: string) {
-    return this.replaceSchoolImage(
-      schoolId,
-      'coverImageUrl',
-      newCoverImageUrl,
-      'cover image',
-    );
+    return this.replaceSchoolImage(schoolId, 'coverImageUrl', newCoverImageUrl, 'cover image');
   }
 
   private async replaceSchoolImage(
@@ -64,10 +61,7 @@ export class SchoolMediaService {
         try {
           await this.s3Service.deleteFile(oldUrl);
         } catch (err) {
-          this.logger.warn(
-            `Failed to delete old ${label} from S3: ${oldUrl}`,
-            err,
-          );
+          this.logger.warn(`Failed to delete old ${label} from S3: ${oldUrl}`, err);
         }
       }
 
@@ -79,9 +73,7 @@ export class SchoolMediaService {
         `Failed to update ${label} for school ${schoolId}`,
         error instanceof Error ? error.stack : 'Unknown error',
       );
-      throw new InternalServerErrorException(
-        `Could not update school ${label}`,
-      );
+      throw new InternalServerErrorException(`Could not update school ${label}`);
     }
   }
 }

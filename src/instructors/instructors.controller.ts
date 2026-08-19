@@ -1,37 +1,39 @@
 import {
-  Controller,
-  Post,
   Body,
-  UseGuards,
+  Controller,
+  Get,
   HttpCode,
   HttpStatus,
-  UseInterceptors,
-  UploadedFile,
-  Get,
   Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
-  ApiTags,
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
-  ApiBearerAuth,
-  ApiConsumes,
-  ApiBody,
+  ApiTags,
 } from '@nestjs/swagger';
+
+import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import { CurrentUser } from '@/auth/decorators/current-user.decorator';
-import { InstructorsService } from './instructors.service';
-import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
 import type { UserEntity } from '@/auth/interfaces/auth.interface';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { fileValidationPipe } from '@/storage/constants/storage.constants';
-import { UpsertDraftDto } from './dto/upsert-draft.dto';
-import { OnboardResponse } from './interface/instrutors.interface';
-import { UploadDocumentDto } from './dto/upload-document.dto';
-import { UploadAvatarDto } from './dto/upload-avatar.dto';
+
+import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
 import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { UploadAvatarDto } from './dto/upload-avatar.dto';
+import { UploadDocumentDto } from './dto/upload-document.dto';
+import { UpsertDraftDto } from './dto/upsert-draft.dto';
+import { InstructorsService } from './instructors.service';
+import { OnboardResponse } from './interface/instrutors.interface';
 
 @ApiTags('Instructors')
 @ApiBearerAuth()
@@ -93,12 +95,7 @@ export class InstructorsController {
     @Body() body: UploadAvatarDto,
     @UploadedFile(fileValidationPipe) file: Express.Multer.File,
   ) {
-    return await this.instructorsService.uploadAvatar(
-      user.clerkId,
-      user.id,
-      file,
-      body.oldFileUrl,
-    );
+    return await this.instructorsService.uploadAvatar(user.clerkId, user.id, file, body.oldFileUrl);
   }
 
   @Post('upload-document')
@@ -131,10 +128,7 @@ export class InstructorsController {
   @Patch('onboarding/draft')
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   @ApiOperation({ summary: 'Autosave onboarding draft progress' })
-  async saveDraft(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpsertDraftDto,
-  ) {
+  async saveDraft(@CurrentUser() user: UserEntity, @Body() dto: UpsertDraftDto) {
     return await this.instructorsService.upsertDraft(user.clerkId, dto);
   }
 
@@ -158,20 +152,14 @@ export class InstructorsController {
   @Patch('personal-info')
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   @ApiOperation({ summary: 'Update instructor personal information' })
-  async updatePersonalInfo(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpdatePersonalInfoDto,
-  ) {
+  async updatePersonalInfo(@CurrentUser() user: UserEntity, @Body() dto: UpdatePersonalInfoDto) {
     return await this.instructorsService.updatePersonalInfo(user.id, dto);
   }
 
   @Patch('vehicle')
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   @ApiOperation({ summary: 'Update instructor vehicle details' })
-  async updateVehicle(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpdateVehicleDto,
-  ) {
+  async updateVehicle(@CurrentUser() user: UserEntity, @Body() dto: UpdateVehicleDto) {
     return await this.instructorsService.updateVehicle(user.id, dto);
   }
 }

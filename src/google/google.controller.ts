@@ -1,28 +1,17 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
-  Query,
-  UseGuards,
   Logger,
-  ParseUUIDPipe,
-  Redirect,
-  Post,
   Param,
-  Body,
-  BadRequestException,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Redirect,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { inspect } from 'node:util';
-import { GoogleService } from './google.service';
-import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
-import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import { Roles } from '@/auth/decorators/roles.decorator';
-import { Role } from '@/auth/enums/role.enum';
-import { GoogleAuthStatus } from './constants/google.constants';
-import { FRONTEND_ROUTES } from '@/common/constants/frontend-routes.constant';
-import { TimezoneService } from './timezone.service';
-import { DetectTimezoneDto } from './dto/detect-timezone.dto';
-import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -31,6 +20,19 @@ import {
   ApiQuery,
   ApiResponse,
 } from '@nestjs/swagger';
+import { inspect } from 'node:util';
+
+import { Roles } from '@/auth/decorators/roles.decorator';
+import { Role } from '@/auth/enums/role.enum';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
+import { FRONTEND_ROUTES } from '@/common/constants/frontend-routes.constant';
+
+import { GoogleAuthStatus } from './constants/google.constants';
+import { DetectTimezoneDto } from './dto/detect-timezone.dto';
+import { GoogleService } from './google.service';
+import { TimezoneService } from './timezone.service';
 
 @Controller('google')
 export class GoogleController {
@@ -43,8 +45,7 @@ export class GoogleController {
     configService: ConfigService,
   ) {
     this.frontendUrl =
-      configService.get<string>('FRONTEND_URL') ??
-      'https://admin.driveinstructor.pro';
+      configService.get<string>('FRONTEND_URL') ?? 'https://admin.driveinstructor.pro';
   }
 
   @Post('timezone')
@@ -62,9 +63,7 @@ export class GoogleController {
   @ApiQuery({ name: 'schoolId', type: 'string', format: 'uuid' })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
-  connectGoogle(
-    @Query('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
-  ) {
+  connectGoogle(@Query('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
     const url = this.googleService.getAuthUrl(schoolId);
     return { url };
   }
@@ -79,9 +78,7 @@ export class GoogleController {
   })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
-  async disconnectGoogle(
-    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
-  ) {
+  async disconnectGoogle(@Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
     await this.googleService.disconnectBusinessProfile(schoolId);
     return { success: true };
   }
@@ -97,10 +94,7 @@ export class GoogleController {
     @Query('state') signedState: string,
     @Query('error') error: string,
   ) {
-    const buildRedirectUrl = (
-      statusKey: 'error' | 'success',
-      statusValue: GoogleAuthStatus,
-    ) =>
+    const buildRedirectUrl = (statusKey: 'error' | 'success', statusValue: GoogleAuthStatus) =>
       `${this.frontendUrl}${FRONTEND_ROUTES.INTEGRATIONS}?${statusKey}=${statusValue}`;
 
     if (error) {
@@ -128,9 +122,7 @@ export class GoogleController {
   @ApiParam({ name: 'schoolId', type: 'string', format: 'uuid' })
   @Roles(Role.Owner, Role.Admin)
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
-  async getLocations(
-    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
-  ) {
+  async getLocations(@Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
     return this.googleService.fetchAvailableLocations(schoolId);
   }
 
@@ -156,16 +148,10 @@ export class GoogleController {
     @Body('accountName') accountName: string,
   ) {
     if (!locationName || !accountName) {
-      throw new BadRequestException(
-        'locationName and accountName are required',
-      );
+      throw new BadRequestException('locationName and accountName are required');
     }
 
-    await this.googleService.setBusinessLocation(
-      schoolId,
-      locationName,
-      accountName,
-    );
+    await this.googleService.setBusinessLocation(schoolId, locationName, accountName);
 
     return { success: true };
   }
@@ -173,9 +159,7 @@ export class GoogleController {
   @Get(':schoolId/reviews')
   @ApiOperation({ summary: 'Get public Google reviews for a school' })
   @ApiParam({ name: 'schoolId', type: 'string', format: 'uuid' })
-  async getReviews(
-    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
-  ) {
+  async getReviews(@Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
     return this.googleService.getSchoolReviews(schoolId);
   }
 }

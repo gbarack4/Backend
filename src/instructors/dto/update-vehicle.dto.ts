@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsIn } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class UpdateVehicleDto {
   @IsString()

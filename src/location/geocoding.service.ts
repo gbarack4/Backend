@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { NominatimResponse } from './interfaces/geocoding.interface';
 import { GeocodeResult } from './types/geocoding.types';
 
@@ -6,8 +7,7 @@ import { GeocodeResult } from './types/geocoding.types';
 export class GeocodingService {
   private readonly logger = new Logger(GeocodingService.name);
 
-  private readonly USER_AGENT =
-    'DrivingSchoolSaaS/1.0 (admin@driveinstructor.pro)';
+  private readonly USER_AGENT = 'DrivingSchoolSaaS/1.0 (admin@driveinstructor.pro)';
   private readonly GEOCODE_URL = 'https://nominatim.openstreetmap.org/search';
   private readonly REQUEST_TIMEOUT_MS = 5000;
   private readonly THROTTLE_DELAY_MS = 1100;
@@ -31,15 +31,9 @@ export class GeocodingService {
     });
   }
 
-  private async performRequest(
-    addressStr: string,
-    countryCode?: string,
-  ): Promise<GeocodeResult> {
+  private async performRequest(addressStr: string, countryCode?: string): Promise<GeocodeResult> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      this.REQUEST_TIMEOUT_MS,
-    );
+    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
 
     try {
       const url = new URL(this.GEOCODE_URL);
@@ -57,9 +51,7 @@ export class GeocodingService {
       });
 
       if (!response.ok) {
-        this.logger.error(
-          `Geocoding API failed with status: ${response.status}`,
-        );
+        this.logger.error(`Geocoding API failed with status: ${response.status}`);
         return {
           status: 'error',
           message: `Nominatim API returned ${response.status}`,
@@ -73,9 +65,7 @@ export class GeocodingService {
         const lng = Number.parseFloat(data[0].lon);
 
         if (Number.isNaN(lat) || Number.isNaN(lng)) {
-          this.logger.warn(
-            `API returned invalid coordinates for: ${addressStr}`,
-          );
+          this.logger.warn(`API returned invalid coordinates for: ${addressStr}`);
           return { status: 'error', message: 'Invalid coordinates returned' };
         }
 
@@ -90,8 +80,7 @@ export class GeocodingService {
         return { status: 'error', message: 'Request timed out' };
       }
 
-      const errMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Geocoding request failed: ${errMessage}`);
       return { status: 'error', message: errMessage };
     } finally {

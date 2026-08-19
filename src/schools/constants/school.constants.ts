@@ -1,25 +1,8 @@
-export const BUSINESS_CATEGORIES = [
-  'driving-school',
-  'motorcycle-school',
-  'truck-school',
-] as const;
+export const BUSINESS_CATEGORIES = ['driving-school', 'motorcycle-school', 'truck-school'] as const;
 
-export const AUSTRALIAN_STATES = [
-  'QLD',
-  'NSW',
-  'VIC',
-  'SA',
-  'WA',
-  'TAS',
-  'NT',
-  'ACT',
-] as const;
+export const AUSTRALIAN_STATES = ['QLD', 'NSW', 'VIC', 'SA', 'WA', 'TAS', 'NT', 'ACT'] as const;
 
-export const DATE_FORMAT_OPTIONS = [
-  'dd-mm-yyyy',
-  'mm-dd-yyyy',
-  'yyyy-mm-dd',
-] as const;
+export const DATE_FORMAT_OPTIONS = ['dd-mm-yyyy', 'mm-dd-yyyy', 'yyyy-mm-dd'] as const;
 
 export const TIME_FORMAT_OPTIONS = ['24h', '12h'] as const;
 

@@ -1,29 +1,25 @@
 import {
+  BadRequestException,
   Controller,
+  HttpStatus,
+  Inject,
+  Logger,
   Post,
   Req,
   Res,
-  BadRequestException,
-  HttpStatus,
-  Logger,
-  Inject,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Webhook } from 'svix';
-import type { Request, Response } from 'express';
-import { UsersService } from './users.service';
-import {
-  ApiBody,
-  ApiHeader,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
-import { StudentsService } from '@/students/students.service';
-import { DB_CONNECTION } from '@/database/database.module';
+import { ApiBody, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { Request, Response } from 'express';
+import { Webhook } from 'svix';
+
 import * as schema from '@/database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
+import { StudentsService } from '@/students/students.service';
+
+import { UsersService } from './users.service';
 
 interface ClerkUserEvent {
   type: 'user.created' | 'user.updated' | 'user.deleted';
@@ -129,19 +125,13 @@ export class WebhooksController {
   })
   @ApiResponse({
     status: 400,
-    description:
-      'Missing payload, malformed object, or invalid cryptographic signature',
+    description: 'Missing payload, malformed object, or invalid cryptographic signature',
   })
-  async handleWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Res() res: Response,
-  ) {
+  async handleWebhook(@Req() req: RawBodyRequest<Request>, @Res() res: Response) {
     const secret = this.configService.get<string>('CLERK_WEBHOOK_SECRET');
 
     if (!secret) {
-      throw new Error(
-        'CLERK_WEBHOOK_SECRET is not set in environment variables',
-      );
+      throw new Error('CLERK_WEBHOOK_SECRET is not set in environment variables');
     }
 
     const payload = req.rawBody?.toString('utf8');
@@ -170,21 +160,13 @@ export class WebhooksController {
 
     try {
       if (eventType === 'user.created' || eventType === 'user.updated') {
-        const {
-          id,
-          email_addresses,
-          first_name,
-          last_name,
-          image_url,
-          unsafe_metadata,
-        } = event.data;
+        const { id, email_addresses, first_name, last_name, image_url, unsafe_metadata } =
+          event.data;
 
         const email = email_addresses?.[0]?.email_address;
 
         if (!email) {
-          throw new BadRequestException(
-            'User email is required but missing from Clerk payload',
-          );
+          throw new BadRequestException('User email is required but missing from Clerk payload');
         }
         const schoolId = unsafe_metadata?.schoolId;
 
@@ -203,15 +185,12 @@ export class WebhooksController {
           );
 
           if (!dbUser?.id) {
-            throw new Error(
-              `Failed to get userId after upserting user ${email}`,
-            );
+            throw new Error(`Failed to get userId after upserting user ${email}`);
           }
 
           if (schoolId) {
             const fullName =
-              [first_name, last_name].filter(Boolean).join(' ') ||
-              email.split('@')[0];
+              [first_name, last_name].filter(Boolean).join(' ') || email.split('@')[0];
 
             await this.studentsService.upsertStudent(
               {
@@ -244,17 +223,12 @@ export class WebhooksController {
       }
 
       if (error instanceof Error) {
-        this.logger.error(
-          `Webhook processing error: ${error.message}`,
-          error.stack,
-        );
+        this.logger.error(`Webhook processing error: ${error.message}`, error.stack);
       } else {
         this.logger.error(`Webhook processing error: ${JSON.stringify(error)}`);
       }
 
-      return res
-        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .json({ success: false });
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false });
     }
   }
 }

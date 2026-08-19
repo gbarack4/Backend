@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
-import { InstructorSchoolsService } from './instructor-schools.service';
-import { DatabaseModule } from '../database/database.module';
+
 import { SuprSendModule } from '@/suprsend/suprsend.module';
+
+import { DatabaseModule } from '../database/database.module';
+import { InstructorSchoolsService } from './instructor-schools.service';
 import { InstructorController } from './instructor.controller';
 import { SchoolAdminController } from './school-admin.controller';
 

@@ -1,13 +1,9 @@
-import {
-  Injectable,
-  Inject,
-  UnauthorizedException,
-  Logger,
-} from '@nestjs/common';
 import { verifyToken } from '@clerk/clerk-sdk-node';
-import clerkConfig from '../config/clerk.config';
-import type { ConfigType } from '@nestjs/config';
 import type { JwtPayload } from '@clerk/types';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
+
+import clerkConfig from '../config/clerk.config';
 
 @Injectable()
 export class ClerkAuthService {
@@ -31,12 +27,8 @@ export class ClerkAuthService {
 
       return payload;
     } catch (error) {
-      this.logger.error(
-        `Token verification failed: ${(error as Error).message}`,
-      );
-      throw new UnauthorizedException(
-        'Invalid or expired authentication token',
-      );
+      this.logger.error(`Token verification failed: ${(error as Error).message}`);
+      throw new UnauthorizedException('Invalid or expired authentication token');
     }
   }
 }

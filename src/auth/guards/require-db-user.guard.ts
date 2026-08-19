@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+
 import { UsersService } from '../../users/users.service';
 import { RequestWithAuth } from '../interfaces/auth.interface';
 
@@ -18,9 +14,7 @@ export class RequireDbUserGuard implements CanActivate {
       throw new UnauthorizedException('Authentication payload is missing');
     }
 
-    const dbUser = await this.usersService.findByClerkId(
-      request.authPayload.clerkId,
-    );
+    const dbUser = await this.usersService.findByClerkId(request.authPayload.clerkId);
 
     if (!dbUser) {
       throw new UnauthorizedException('User profile not found in database');

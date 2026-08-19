@@ -1,10 +1,8 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+
 import { GOOGLE_ENDPOINTS } from './constants/google.endpoints';
-import {
-  GoogleGeocodeResponse,
-  GoogleTimezoneResponse,
-} from './types/google.types';
+import { GoogleGeocodeResponse, GoogleTimezoneResponse } from './types/google.types';
 
 @Injectable()
 export class TimezoneService {
@@ -12,9 +10,7 @@ export class TimezoneService {
   private readonly apiKey: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.apiKey = this.configService.getOrThrow<string>(
-      'GOOGLE_TIMEZONE_API_KEY',
-    );
+    this.apiKey = this.configService.getOrThrow<string>('GOOGLE_TIMEZONE_API_KEY');
   }
 
   private suggestDateFormat(countryCode?: string): string {

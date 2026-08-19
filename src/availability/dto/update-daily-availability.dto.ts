@@ -1,15 +1,15 @@
-import {
-  IsInt,
-  IsBoolean,
-  IsString,
-  IsArray,
-  ValidateNested,
-  Min,
-  Max,
-  Matches,
-  ValidateIf,
-} from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 
 class BreakDto {
   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'Format must be HH:mm' })

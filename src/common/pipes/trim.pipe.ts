@@ -1,4 +1,4 @@
-import { Injectable, PipeTransform, ArgumentMetadata } from '@nestjs/common';
+import { ArgumentMetadata, Injectable, PipeTransform } from '@nestjs/common';
 
 @Injectable()
 export class TrimPipe implements PipeTransform<unknown, unknown> {

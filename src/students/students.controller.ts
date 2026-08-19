@@ -1,22 +1,24 @@
 import {
-  Controller,
-  Post,
-  Patch,
   Body,
-  UseGuards,
+  Controller,
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
-import { StudentsService } from './students.service';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+
+import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import type { UserEntity } from '@/auth/interfaces/auth.interface';
+
 import { SyncStudentDto } from './dto/sync-student.dto';
 import { UpdateStudentAvatarDto } from './dto/update-student-avatar.dto';
 import { UpdateStudentPersonalInfoDto } from './dto/update-student-personal-info.dto';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { StudentsService } from './students.service';
 
 @Controller('students')
 export class StudentsController {
@@ -24,14 +26,8 @@ export class StudentsController {
 
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   @Post('sync')
-  async syncStudent(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: SyncStudentDto,
-  ) {
-    return this.studentsService.syncStudentWithSchool(
-      user.clerkId,
-      dto.schoolId,
-    );
+  async syncStudent(@CurrentUser() user: UserEntity, @Body() dto: SyncStudentDto) {
+    return this.studentsService.syncStudentWithSchool(user.clerkId, dto.schoolId);
   }
 
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
@@ -66,18 +62,13 @@ export class StudentsController {
     @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
     @Body() dto: UpdateStudentAvatarDto,
   ) {
-    return this.studentsService.updateAvatarUrl(
-      user.id,
-      schoolId,
-      dto.avatarUrl,
-    );
+    return this.studentsService.updateAvatarUrl(user.id, schoolId, dto.avatarUrl);
   }
 
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
   @Patch('school/:schoolId/me/personal-info')
   @ApiOperation({
-    summary:
-      'Update current student personal information for a specific school',
+    summary: 'Update current student personal information for a specific school',
   })
   @ApiResponse({
     status: 200,

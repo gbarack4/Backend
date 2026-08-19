@@ -1,20 +1,22 @@
-import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
-import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import {
   Body,
   Controller,
   Get,
-  Param,
   Headers,
+  Param,
   ParseUUIDPipe,
   Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { InstructorSchoolsService } from './instructor-schools.service';
-import { CreateInviteDto } from './dto/create-invite.dto';
-import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
+
 import { Roles } from '@/auth/decorators/roles.decorator';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
+
+import { CreateInviteDto } from './dto/create-invite.dto';
+import { InstructorSchoolsService } from './instructor-schools.service';
 
 @Controller('school-admin')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
@@ -23,9 +25,7 @@ export class SchoolAdminController {
   constructor(private readonly service: InstructorSchoolsService) {}
 
   @Get('instructors/:schoolId')
-  async getInstructors(
-    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
-  ) {
+  async getInstructors(@Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
     return this.service.getSchoolInstructors(schoolId);
   }
 
@@ -38,9 +38,7 @@ export class SchoolAdminController {
   }
 
   @Get('requests/:schoolId')
-  async getRequests(
-    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
-  ) {
+  async getRequests(@Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
     return this.service.findSchoolRequests(schoolId);
   }
 
@@ -55,15 +53,7 @@ export class SchoolAdminController {
   }
 
   @Post('invites')
-  async sendInvite(
-    @Headers('x-school-id') schoolId: string,
-    @Body() dto: CreateInviteDto,
-  ) {
-    return this.service.createSchoolInvite(
-      schoolId,
-      dto.email,
-      dto.name,
-      dto.message,
-    );
+  async sendInvite(@Headers('x-school-id') schoolId: string, @Body() dto: CreateInviteDto) {
+    return this.service.createSchoolInvite(schoolId, dto.email, dto.name, dto.message);
   }
 }

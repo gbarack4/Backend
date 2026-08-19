@@ -1,8 +1,9 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { DB_CONNECTION } from '@/database/database.module';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import * as schema from '@/database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class StudentsService {
@@ -23,8 +24,7 @@ export class StudentsService {
     }
 
     const fullName =
-      [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-      user.email.split('@')[0];
+      [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email.split('@')[0];
 
     return this.upsertStudent({
       userId: user.id,
@@ -69,20 +69,11 @@ export class StudentsService {
     return student;
   }
 
-  async updateAvatarUrl(
-    userId: string,
-    schoolId: string,
-    avatarUrl: string | null,
-  ) {
+  async updateAvatarUrl(userId: string, schoolId: string, avatarUrl: string | null) {
     const [student] = await this.db
       .update(schema.students)
       .set({ avatarUrl })
-      .where(
-        and(
-          eq(schema.students.userId, userId),
-          eq(schema.students.schoolId, schoolId),
-        ),
-      )
+      .where(and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)))
       .returning();
 
     if (!student) {
@@ -108,12 +99,7 @@ export class StudentsService {
           name: data.fullName,
           phone: data.phone,
         })
-        .where(
-          and(
-            eq(schema.students.userId, userId),
-            eq(schema.students.schoolId, schoolId),
-          ),
-        )
+        .where(and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)))
         .returning();
 
       if (!student) {
@@ -155,12 +141,7 @@ export class StudentsService {
       })
       .from(schema.students)
       .innerJoin(schema.users, eq(schema.students.userId, schema.users.id))
-      .where(
-        and(
-          eq(schema.students.userId, userId),
-          eq(schema.students.schoolId, schoolId),
-        ),
-      )
+      .where(and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)))
       .limit(1);
 
     if (!student) {

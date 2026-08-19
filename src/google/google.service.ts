@@ -1,19 +1,22 @@
-import {
-  Injectable,
-  Inject,
-  UnauthorizedException,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
-import { OAuth2Client, Credentials } from 'google-auth-library';
-import { DB_CONNECTION } from '@/database/database.module';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
-import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Credentials, OAuth2Client } from 'google-auth-library';
 import { inspect } from 'node:util';
+
 import * as schema from '@/database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
+
+import { GOOGLE_ENDPOINTS } from './constants/google.endpoints';
 import {
   GoogleAccountsResponse,
   GoogleLocation,
@@ -21,7 +24,6 @@ import {
   GoogleReviewsResponse,
   SchoolGoogleData,
 } from './types/google.types';
-import { GOOGLE_ENDPOINTS } from './constants/google.endpoints';
 
 @Injectable()
 export class GoogleService {
@@ -41,9 +43,7 @@ export class GoogleService {
   ) {
     this.googleConfig = {
       clientId: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
-      clientSecret: this.configService.getOrThrow<string>(
-        'GOOGLE_CLIENT_SECRET',
-      ),
+      clientSecret: this.configService.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
       callbackUrl: this.configService.getOrThrow<string>('GOOGLE_CALLBACK_URL'),
       stateSecret: this.configService.getOrThrow<string>('GOOGLE_STATE_SECRET'),
     };
@@ -58,9 +58,7 @@ export class GoogleService {
     this.logger.error(message, inspect(errorDetails));
   }
 
-  private async getSchoolGoogleData(
-    schoolId: string,
-  ): Promise<SchoolGoogleData> {
+  private async getSchoolGoogleData(schoolId: string): Promise<SchoolGoogleData> {
     const [school] = await this.db
       .select({
         id: schema.schools.id,
@@ -114,10 +112,7 @@ export class GoogleService {
       const hashBuf = Buffer.from(hash, 'hex');
       const expectedBuf = Buffer.from(expectedHash, 'hex');
 
-      if (
-        hashBuf.length !== expectedBuf.length ||
-        !crypto.timingSafeEqual(hashBuf, expectedBuf)
-      ) {
+      if (hashBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(hashBuf, expectedBuf)) {
         throw new Error('State hash mismatch');
       }
 
@@ -149,10 +144,7 @@ export class GoogleService {
           })
           .where(eq(schema.schools.id, schoolId))
           .catch((err: unknown) => {
-            this.logger.error(
-              'Failed to persist refreshed tokens',
-              inspect(err),
-            );
+            this.logger.error('Failed to persist refreshed tokens', inspect(err));
           });
       }
     };
@@ -167,10 +159,7 @@ export class GoogleService {
     try {
       return await operation(client);
     } catch (error) {
-      this.logGoogleError(
-        `Google API Operation Failed for School ${schoolId}`,
-        error,
-      );
+      this.logGoogleError(`Google API Operation Failed for School ${schoolId}`, error);
       throw error;
     } finally {
       client.removeListener('tokens', onTokens);
@@ -185,12 +174,7 @@ export class GoogleService {
     return client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
-      scope: [
-        'https://www.googleapis.com/auth/business.manage',
-        'openid',
-        'email',
-        'profile',
-      ],
+      scope: ['https://www.googleapis.com/auth/business.manage', 'openid', 'email', 'profile'],
       state: signedState,
     });
   }
@@ -340,9 +324,7 @@ export class GoogleService {
     }
 
     if (!school.locationName || !school.accountName) {
-      throw new BadRequestException(
-        'Google Business Profile location or account is not selected',
-      );
+      throw new BadRequestException('Google Business Profile location or account is not selected');
     }
 
     return this.withAuthenticatedClient(
@@ -351,10 +333,7 @@ export class GoogleService {
       school.refreshToken,
       async (client) => {
         const reviewsRes = await client.request<GoogleReviewsResponse>({
-          url: GOOGLE_ENDPOINTS.REVIEWS(
-            school.accountName!,
-            school.locationName!,
-          ),
+          url: GOOGLE_ENDPOINTS.REVIEWS(school.accountName!, school.locationName!),
         });
 
         return reviewsRes.data.reviews ?? [];

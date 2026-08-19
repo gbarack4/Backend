@@ -5,9 +5,7 @@ export default registerAs('clerk', () => {
   const issuer = process.env.CLERK_ISSUER;
 
   if (!secretKey || !issuer) {
-    throw new Error(
-      'CRITICAL: CLERK_SECRET_KEY or CLERK_ISSUER is not set in .env',
-    );
+    throw new Error('CRITICAL: CLERK_SECRET_KEY or CLERK_ISSUER is not set in .env');
   }
 
   return {

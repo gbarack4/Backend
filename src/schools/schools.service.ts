@@ -1,22 +1,22 @@
 import {
-  Injectable,
   Inject,
+  Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
-  InternalServerErrorException,
 } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq } from 'drizzle-orm';
-import * as schema from '../database/schema';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import { DB_CONNECTION } from '@/database/database.module';
+
+import * as schema from '../database/schema';
 
 @Injectable()
 export class SchoolsService {
   private readonly logger = new Logger(SchoolsService.name);
 
-  constructor(
-    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
-  ) {}
+  constructor(@Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>) {}
 
   async getDefaultSchool(userId: string) {
     try {
@@ -27,23 +27,15 @@ export class SchoolsService {
           slug: schema.schools.slug,
         })
         .from(schema.schoolUsers)
-        .innerJoin(
-          schema.schools,
-          eq(schema.schools.id, schema.schoolUsers.schoolId),
-        )
+        .innerJoin(schema.schools, eq(schema.schools.id, schema.schoolUsers.schoolId))
         .where(eq(schema.schoolUsers.userId, userId))
         .orderBy(schema.schoolUsers.createdAt)
         .limit(1);
 
       return record ?? null;
     } catch (error) {
-      this.logger.error(
-        `Failed to get default school for user ${userId}`,
-        error,
-      );
-      throw new InternalServerErrorException(
-        'Could not retrieve default school',
-      );
+      this.logger.error(`Failed to get default school for user ${userId}`, error);
+      throw new InternalServerErrorException('Could not retrieve default school');
     }
   }
 
@@ -70,10 +62,7 @@ export class SchoolsService {
     });
 
     const primaryDomain = await this.db.query.schoolDomains.findFirst({
-      where: and(
-        eq(schema.schoolDomains.schoolId, id),
-        eq(schema.schoolDomains.isPrimary, true),
-      ),
+      where: and(eq(schema.schoolDomains.schoolId, id), eq(schema.schoolDomains.isPrimary, true)),
     });
 
     let joinStatus = 'none';
@@ -108,14 +97,8 @@ export class SchoolsService {
         date: schema.bookings.createdAt,
       })
       .from(schema.reviews)
-      .innerJoin(
-        schema.bookings,
-        eq(schema.reviews.bookingId, schema.bookings.id),
-      )
-      .innerJoin(
-        schema.students,
-        eq(schema.reviews.studentId, schema.students.id),
-      )
+      .innerJoin(schema.bookings, eq(schema.reviews.bookingId, schema.bookings.id))
+      .innerJoin(schema.students, eq(schema.reviews.studentId, schema.students.id))
       .where(eq(schema.bookings.schoolId, id));
 
     const reviews = rawReviews.map((rev) => ({
@@ -130,9 +113,7 @@ export class SchoolsService {
     const totalRating = reviews.reduce((acc, r) => acc + r.rating, 0);
     const rating = reviewCount > 0 ? totalRating / reviewCount : 0;
 
-    const coords = location?.publicCoordinates as
-      | { x: number; y: number }
-      | undefined;
+    const coords = location?.publicCoordinates as { x: number; y: number } | undefined;
 
     return {
       id: school.id,

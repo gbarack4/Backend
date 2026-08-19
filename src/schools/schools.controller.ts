@@ -1,39 +1,34 @@
 import {
-  Controller,
-  Post,
   Body,
-  UseGuards,
+  Controller,
   Get,
-  Patch,
   Headers,
   NotFoundException,
-  Query,
   Param,
   ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { SchoolsService } from './schools.service';
-import { SetupSchoolDto } from './dto/setup-school.dto';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '../auth/guards/require-db-user.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { UserEntity } from '../auth/interfaces/auth.interface';
-import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
-import { UpdateSchoolLogoDto } from './dto/update-school-logo.dto';
-import { UpdateSchoolCoverImageDto } from './dto/update-school-cover-image.dto';
 import { SchoolRolesGuard } from '../auth/guards/school-roles.guard';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import {
-  ApiBearerAuth,
-  ApiHeader,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
-import { SchoolSearchService } from './school-search.service';
+import type { UserEntity } from '../auth/interfaces/auth.interface';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
-import { SchoolSetupService } from './school-setup.service';
-import { SchoolSettingsService } from './school-settings.service';
+import { SetupSchoolDto } from './dto/setup-school.dto';
+import { UpdateSchoolCoverImageDto } from './dto/update-school-cover-image.dto';
+import { UpdateSchoolLogoDto } from './dto/update-school-logo.dto';
+import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { SchoolMediaService } from './school-media.service';
+import { SchoolSearchService } from './school-search.service';
+import { SchoolSettingsService } from './school-settings.service';
+import { SchoolSetupService } from './school-setup.service';
+import { SchoolsService } from './schools.service';
 
 @ApiTags('Schools Management')
 @ApiBearerAuth()
@@ -155,10 +150,7 @@ export class SchoolsController {
     @Headers('x-school-id') schoolId: string,
     @Body() dto: UpdateSchoolCoverImageDto,
   ) {
-    return this.schoolMediaService.updateSchoolCoverImage(
-      schoolId,
-      dto.coverImageUrl,
-    );
+    return this.schoolMediaService.updateSchoolCoverImage(schoolId, dto.coverImageUrl);
   }
 
   @Get('search')
@@ -167,10 +159,7 @@ export class SchoolsController {
     status: 200,
     description: 'Returns an array of schools matching the search criteria',
   })
-  async search(
-    @CurrentUser() user: UserEntity,
-    @Query() query: SearchSchoolsDto,
-  ) {
+  async search(@CurrentUser() user: UserEntity, @Query() query: SearchSchoolsDto) {
     return this.schoolSearchService.searchSchools(query, user.id);
   }
 
@@ -178,13 +167,9 @@ export class SchoolsController {
   @ApiOperation({ summary: 'Get actively joined schools for the current user' })
   @ApiResponse({
     status: 200,
-    description:
-      'Returns an array of schools the instructor has actively joined',
+    description: 'Returns an array of schools the instructor has actively joined',
   })
-  async getActiveSchools(
-    @CurrentUser() user: UserEntity,
-    @Query('q') q?: string,
-  ) {
+  async getActiveSchools(@CurrentUser() user: UserEntity, @Query('q') q?: string) {
     return this.schoolSearchService.getActiveJoinedSchools(user.id, q);
   }
 

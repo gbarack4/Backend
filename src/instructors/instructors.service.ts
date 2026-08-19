@@ -1,21 +1,23 @@
 import {
-  Injectable,
-  Inject,
-  NotFoundException,
   ConflictException,
+  Inject,
+  Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
-import { DB_CONNECTION } from '@/database/database.module';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import * as schema from '@/database/schema';
-import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
-import { S3Service } from '@/storage/s3.service';
+import { DB_CONNECTION } from '@/database/database.module';
 import { instructorOnboardingDrafts } from '@/database/schema';
-import { UpsertDraftDto } from './dto/upsert-draft.dto';
+import { S3Service } from '@/storage/s3.service';
+
+import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
 import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { UpsertDraftDto } from './dto/upsert-draft.dto';
 
 @Injectable()
 export class InstructorsService {
@@ -35,9 +37,7 @@ export class InstructorsService {
     return updates;
   }
 
-  private buildInstructorAddressUpdates(
-    address?: UpdatePersonalInfoDto['address'],
-  ) {
+  private buildInstructorAddressUpdates(address?: UpdatePersonalInfoDto['address']) {
     if (!address) return {};
     const updates: Partial<typeof schema.instructors.$inferInsert> = {};
     if (address.line1 !== undefined) updates.addressLine1 = address.line1;
@@ -66,8 +66,7 @@ export class InstructorsService {
 
     const identity = userRecords[0];
     const fullName =
-      [identity.firstName, identity.lastName].filter(Boolean).join(' ') ||
-      'Instructor';
+      [identity.firstName, identity.lastName].filter(Boolean).join(' ') || 'Instructor';
 
     const existingInstructor = await this.db
       .select({ id: schema.instructors.id })
@@ -76,9 +75,7 @@ export class InstructorsService {
       .limit(1);
 
     if (existingInstructor.length) {
-      throw new ConflictException(
-        'An instructor profile already exists for this account',
-      );
+      throw new ConflictException('An instructor profile already exists for this account');
     }
 
     try {
@@ -126,9 +123,7 @@ export class InstructorsService {
 
         await tx
           .delete(schema.instructorOnboardingDrafts)
-          .where(
-            eq(schema.instructorOnboardingDrafts.clerkUserId, clerkUserId),
-          );
+          .where(eq(schema.instructorOnboardingDrafts.clerkUserId, clerkUserId));
 
         return {
           success: true,
@@ -138,9 +133,7 @@ export class InstructorsService {
       });
     } catch (error) {
       this.logger.error(`Failed to onboard instructor: ${error}`);
-      throw new InternalServerErrorException(
-        'Failed to create instructor profile',
-      );
+      throw new InternalServerErrorException('Failed to create instructor profile');
     }
   }
 
@@ -212,9 +205,7 @@ export class InstructorsService {
       };
     } catch (error) {
       this.logger.error(`Failed to upload instructor document to S3: ${error}`);
-      throw new InternalServerErrorException(
-        'Could not process document upload',
-      );
+      throw new InternalServerErrorException('Could not process document upload');
     }
   }
 
@@ -267,10 +258,7 @@ export class InstructorsService {
       })
       .from(schema.instructors)
       .where(eq(schema.instructors.userId, userId))
-      .leftJoin(
-        schema.cars,
-        eq(schema.cars.instructorId, schema.instructors.id),
-      );
+      .leftJoin(schema.cars, eq(schema.cars.instructorId, schema.instructors.id));
 
     if (!profileRecords.length) {
       throw new NotFoundException('Instructor profile not found');
@@ -292,22 +280,16 @@ export class InstructorsService {
       return await this.db.transaction(async (tx) => {
         const userUpdates = this.buildUserUpdates(dto);
         if (Object.keys(userUpdates).length > 0) {
-          await tx
-            .update(schema.users)
-            .set(userUpdates)
-            .where(eq(schema.users.id, userId));
+          await tx.update(schema.users).set(userUpdates).where(eq(schema.users.id, userId));
         }
 
         const instructor = await tx.query.instructors.findFirst({
           where: eq(schema.instructors.userId, userId),
         });
 
-        if (!instructor)
-          throw new NotFoundException('Instructor profile not found');
+        if (!instructor) throw new NotFoundException('Instructor profile not found');
 
-        const instructorUpdates: Partial<
-          typeof schema.instructors.$inferInsert
-        > = {
+        const instructorUpdates: Partial<typeof schema.instructors.$inferInsert> = {
           ...this.buildInstructorAddressUpdates(dto.address),
         };
 
@@ -344,8 +326,7 @@ export class InstructorsService {
         where: eq(schema.instructors.userId, userId),
       });
 
-      if (!instructor)
-        throw new NotFoundException('Instructor profile not found');
+      if (!instructor) throw new NotFoundException('Instructor profile not found');
 
       const carUpdates: Partial<typeof schema.cars.$inferInsert> = {};
 
@@ -354,8 +335,7 @@ export class InstructorsService {
       if (dto.year !== undefined) carUpdates.year = Number.parseInt(dto.year);
       if (dto.registrationNumber !== undefined)
         carUpdates.registrationNumber = dto.registrationNumber;
-      if (dto.dualControl !== undefined)
-        carUpdates.dualControl = dto.dualControl === 'yes';
+      if (dto.dualControl !== undefined) carUpdates.dualControl = dto.dualControl === 'yes';
       if (dto.transmission !== undefined) {
         carUpdates.transmission = dto.transmission;
       }

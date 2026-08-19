@@ -1,9 +1,10 @@
-import { Module, Global } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+
 import { UsersModule } from '../users/users.module';
+import { AuthController } from './auth.controller';
 import { ClerkAuthService } from './clerk-auth.service';
 import { ClerkAuthGuard } from './guards/clerk-auth.guard';
 import { RequireDbUserGuard } from './guards/require-db-user.guard';
-import { AuthController } from './auth.controller';
 
 @Global()
 @Module({

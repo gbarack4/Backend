@@ -1,12 +1,14 @@
-import { Controller, Put, Body, UseGuards, Get } from '@nestjs/common';
-import { AvailabilityService } from './availability.service';
-import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto';
-import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
-import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
+import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+
+import { CurrentInstructorId } from '@/auth/decorators/current-instructor.decorator';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
-import { CurrentInstructorId } from '@/auth/decorators/current-instructor.decorator';
+import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
+import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
+
+import { AvailabilityService } from './availability.service';
+import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto';
 
 @Controller('availability')
 export class AvailabilityController {

@@ -1,19 +1,21 @@
 import {
-  Injectable,
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  BadRequestException,
   Inject,
+  Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq } from 'drizzle-orm';
-import * as schema from '../../database/schema';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import { REQUIRE_PERMISSION_KEY } from '../decorators/require-permission.decorator';
-import { RequestWithAuth } from '../interfaces/auth.interface';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import { DB_CONNECTION } from '@/database/database.module';
+
+import * as schema from '../../database/schema';
+import { REQUIRE_PERMISSION_KEY } from '../decorators/require-permission.decorator';
+import { ROLES_KEY } from '../decorators/roles.decorator';
+import { RequestWithAuth } from '../interfaces/auth.interface';
 
 @Injectable()
 export class SchoolRolesGuard implements CanActivate {
@@ -32,9 +34,7 @@ export class SchoolRolesGuard implements CanActivate {
       (request.query?.schoolId as string);
 
     if (!schoolId) {
-      throw new BadRequestException(
-        'schoolId (header, param, or query) is required',
-      );
+      throw new BadRequestException('schoolId (header, param, or query) is required');
     }
 
     const userId = request.currentUser?.id;
@@ -48,22 +48,17 @@ export class SchoolRolesGuard implements CanActivate {
         permission: schema.schoolUsers.permission,
       })
       .from(schema.schoolUsers)
-      .where(
-        and(
-          eq(schema.schoolUsers.userId, userId),
-          eq(schema.schoolUsers.schoolId, schoolId),
-        ),
-      )
+      .where(and(eq(schema.schoolUsers.userId, userId), eq(schema.schoolUsers.schoolId, schoolId)))
       .limit(1);
 
     if (!membership) {
       throw new ForbiddenException('You do not have access to this school');
     }
 
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
-      ROLES_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (requiredRoles && !requiredRoles.includes(membership.role)) {
       throw new ForbiddenException(
@@ -71,15 +66,14 @@ export class SchoolRolesGuard implements CanActivate {
       );
     }
 
-    const requiredPermission = this.reflector.getAllAndOverride<string>(
-      REQUIRE_PERMISSION_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredPermission = this.reflector.getAllAndOverride<string>(REQUIRE_PERMISSION_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (requiredPermission) {
       const hasPermission =
-        membership.role === 'owner' ||
-        membership.permission === requiredPermission;
+        membership.role === 'owner' || membership.permission === requiredPermission;
 
       if (!hasPermission) {
         throw new ForbiddenException(

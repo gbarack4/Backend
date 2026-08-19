@@ -1,20 +1,22 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
+  Inject,
   Query,
   Req,
-  UseGuards,
-  ForbiddenException,
   UnauthorizedException,
-  Inject,
+  UseGuards,
 } from '@nestjs/common';
-import { ClerkAuthGuard } from './guards/clerk-auth.guard';
-import { UsersService } from '../users/users.service';
-import type { RequestWithAuth } from './interfaces/auth.interface';
-import { DB_CONNECTION } from '@/database/database.module';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import * as schema from '@/database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
+
+import { UsersService } from '../users/users.service';
+import { ClerkAuthGuard } from './guards/clerk-auth.guard';
+import type { RequestWithAuth } from './interfaces/auth.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -96,9 +98,7 @@ export class AuthController {
     }
 
     if (!hasAccess) {
-      throw new ForbiddenException(
-        `Access denied. No active profile found for app: ${app}`,
-      );
+      throw new ForbiddenException(`Access denied. No active profile found for app: ${app}`);
     }
 
     return {

@@ -1,8 +1,4 @@
-import {
-  MaxFileSizeValidator,
-  FileTypeValidator,
-  ParseFilePipe,
-} from '@nestjs/common';
+import { FileTypeValidator, MaxFileSizeValidator, ParseFilePipe } from '@nestjs/common';
 
 export const ALLOWED_FILE_TYPES = {
   jpg: 'image/jpeg',

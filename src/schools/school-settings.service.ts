@@ -1,26 +1,26 @@
 import {
-  Injectable,
+  ConflictException,
+  HttpException,
   Inject,
+  Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
-  HttpException,
-  ConflictException,
-  InternalServerErrorException,
 } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, SQL, sql } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import slugify from 'slugify';
-import * as schema from '../database/schema';
-import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
-import { APP_DOMAIN_SUFFIX } from './constants/school.constants';
-import { GeocodingService } from '@/location/geocoding.service';
-import { GeocodeResult } from '@/location/types/geocoding.types';
+
 import { stripStreetNumber } from '@/common/utils/address.util';
 import { DB_CONNECTION } from '@/database/database.module';
+import { GeocodingService } from '@/location/geocoding.service';
+import { GeocodeResult } from '@/location/types/geocoding.types';
 
-function isPostgresError(
-  error: unknown,
-): error is { code: string; constraint?: string } {
+import * as schema from '../database/schema';
+import { APP_DOMAIN_SUFFIX } from './constants/school.constants';
+import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
+
+function isPostgresError(error: unknown): error is { code: string; constraint?: string } {
   return typeof error === 'object' && error !== null && 'code' in error;
 }
 
@@ -42,10 +42,7 @@ export class SchoolSettingsService {
           domain: schema.schoolDomains,
         })
         .from(schema.schools)
-        .leftJoin(
-          schema.locations,
-          eq(schema.locations.schoolId, schema.schools.id),
-        )
+        .leftJoin(schema.locations, eq(schema.locations.schoolId, schema.schools.id))
         .leftJoin(
           schema.schoolDomains,
           and(
@@ -63,9 +60,7 @@ export class SchoolSettingsService {
 
       const { school, location, domain } = records[0];
 
-      const domainPrefix = domain?.domain
-        ? domain.domain.replace(`.${APP_DOMAIN_SUFFIX}`, '')
-        : '';
+      const domainPrefix = domain?.domain ? domain.domain.replace(`.${APP_DOMAIN_SUFFIX}`, '') : '';
 
       return {
         id: school.id,
@@ -91,9 +86,7 @@ export class SchoolSettingsService {
       if (error instanceof NotFoundException) throw error;
 
       this.logger.error(`Failed to get settings for school ${schoolId}`, error);
-      throw new InternalServerErrorException(
-        'Could not retrieve school settings',
-      );
+      throw new InternalServerErrorException('Could not retrieve school settings');
     }
   }
 
@@ -105,10 +98,7 @@ export class SchoolSettingsService {
           location: schema.locations,
         })
         .from(schema.schools)
-        .leftJoin(
-          schema.locations,
-          eq(schema.locations.schoolId, schema.schools.id),
-        )
+        .leftJoin(schema.locations, eq(schema.locations.schoolId, schema.schools.id))
         .where(eq(schema.schools.id, schoolId))
         .limit(1);
 
@@ -118,12 +108,8 @@ export class SchoolSettingsService {
 
       const { school, location } = records[0];
 
-      const {
-        geoResult,
-        publicGeoResult,
-        publicAddressLine1,
-        hasAddressUpdate,
-      } = await this.resolveGeocodeResult(schoolId, dto, location);
+      const { geoResult, publicGeoResult, publicAddressLine1, hasAddressUpdate } =
+        await this.resolveGeocodeResult(schoolId, dto, location);
 
       await this.db.transaction(async (tx) => {
         await this.applySchoolUpdates(tx, school, dto);
@@ -195,19 +181,11 @@ export class SchoolSettingsService {
 
     const [geoResult, publicGeoResult] = await Promise.all([
       this.geocodingService.getCoordinatesFromAddress(fullAddress, 'au'),
-      this.geocodingService.getCoordinatesFromAddress(
-        publicAddressForGeo,
-        'au',
-      ),
+      this.geocodingService.getCoordinatesFromAddress(publicAddressForGeo, 'au'),
     ]);
 
     this.logGeocodeOutcome(schoolId, fullAddress, geoResult, 'exact');
-    this.logGeocodeOutcome(
-      schoolId,
-      publicAddressForGeo,
-      publicGeoResult,
-      'public',
-    );
+    this.logGeocodeOutcome(schoolId, publicAddressForGeo, publicGeoResult, 'public');
 
     return {
       geoResult,
@@ -239,10 +217,7 @@ export class SchoolSettingsService {
 
   private mapUpdateError(schoolId: string, error: unknown): HttpException {
     if (isPostgresError(error) && error.code === '23505') {
-      const conflictConstraints = [
-        'schools_slug_key',
-        'school_domains_domain_key',
-      ];
+      const conflictConstraints = ['schools_slug_key', 'school_domains_domain_key'];
       if (error.constraint && conflictConstraints.includes(error.constraint)) {
         return new ConflictException(
           'This domain prefix is already taken. Please choose another one.',
@@ -332,10 +307,7 @@ export class SchoolSettingsService {
     const { updates, newPrefix } = this.buildSchoolUpdates(dto, school.slug);
 
     if (Object.keys(updates).length > 0) {
-      await tx
-        .update(schema.schools)
-        .set(updates)
-        .where(eq(schema.schools.id, school.id));
+      await tx.update(schema.schools).set(updates).where(eq(schema.schools.id, school.id));
     }
 
     if (newPrefix) {
@@ -369,10 +341,7 @@ export class SchoolSettingsService {
     );
 
     if (Object.keys(updates).length > 0) {
-      await tx
-        .update(schema.locations)
-        .set(updates)
-        .where(eq(schema.locations.schoolId, schoolId));
+      await tx.update(schema.locations).set(updates).where(eq(schema.locations.schoolId, schoolId));
     }
   }
 }

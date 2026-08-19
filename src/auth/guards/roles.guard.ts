@@ -1,17 +1,19 @@
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
   Inject,
+  Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+import * as schema from '@/database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
+
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { RequestWithAuth } from '../interfaces/auth.interface';
-import { DB_CONNECTION } from '@/database/database.module';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
-import * as schema from '@/database/schema';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -22,10 +24,10 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
-      ROLES_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (!requiredRoles?.length) {
       return true;
@@ -38,11 +40,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User profile not found');
     }
 
-    const hasAccess = await this.checkUserRoles(
-      requiredRoles,
-      user.id,
-      request,
-    );
+    const hasAccess = await this.checkUserRoles(requiredRoles, user.id, request);
 
     if (!hasAccess) {
       throw new ForbiddenException(
@@ -59,22 +57,14 @@ export class RolesGuard implements CanActivate {
     request: RequestWithAuth,
   ): Promise<boolean> {
     for (const role of roles) {
-      if (role === 'instructor' && (await this.isInstructor(userId, request)))
-        return true;
+      if (role === 'instructor' && (await this.isInstructor(userId, request))) return true;
       if (role === 'student' && (await this.isStudent(userId))) return true;
-      if (
-        ['owner', 'admin', 'staff'].includes(role) &&
-        (await this.isStaff(userId))
-      )
-        return true;
+      if (['owner', 'admin', 'staff'].includes(role) && (await this.isStaff(userId))) return true;
     }
     return false;
   }
 
-  private async isInstructor(
-    userId: string,
-    request: RequestWithAuth,
-  ): Promise<boolean> {
+  private async isInstructor(userId: string, request: RequestWithAuth): Promise<boolean> {
     const record = await this.db
       .select({ id: schema.instructors.id })
       .from(schema.instructors)

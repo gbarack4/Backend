@@ -1,44 +1,42 @@
 import { relations } from 'drizzle-orm/relations';
+
 import {
-  instructors,
-  instructorSchools,
-  schools,
-  locations,
-  services,
-  users,
-  schoolUsers,
-  students,
+  activityLogs,
   availability,
   availabilityBlocks,
-  bookings,
-  bookingForms,
-  formFields,
-  fieldOptions,
-  pricingRules,
-  invoices,
-  notifications,
-  invites,
-  reviews,
-  coupons,
-  payments,
-  activityLogs,
-  availabilityLocations,
   availabilityBreaks,
+  availabilityLocations,
+  bookingForms,
+  bookings,
+  coupons,
+  fieldOptions,
+  formFields,
+  instructors,
+  instructorSchools,
+  invites,
+  invoices,
+  locations,
+  notifications,
+  payments,
+  pricingRules,
+  reviews,
+  schools,
+  schoolUsers,
+  services,
+  students,
+  users,
 } from './schema';
 
-export const instructorSchoolsRelations = relations(
-  instructorSchools,
-  ({ one }) => ({
-    instructor: one(instructors, {
-      fields: [instructorSchools.instructorId],
-      references: [instructors.id],
-    }),
-    school: one(schools, {
-      fields: [instructorSchools.schoolId],
-      references: [schools.id],
-    }),
+export const instructorSchoolsRelations = relations(instructorSchools, ({ one }) => ({
+  instructor: one(instructors, {
+    fields: [instructorSchools.instructorId],
+    references: [instructors.id],
   }),
-);
+  school: one(schools, {
+    fields: [instructorSchools.schoolId],
+    references: [schools.id],
+  }),
+}));
 
 export const instructorsRelations = relations(instructors, ({ one, many }) => ({
   instructorSchools: many(instructorSchools),
@@ -115,47 +113,35 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
   reviews: many(reviews),
 }));
 
-export const availabilityRelations = relations(
-  availability,
-  ({ one, many }) => ({
-    instructor: one(instructors, {
-      fields: [availability.instructorId],
-      references: [instructors.id],
-    }),
-    locations: many(availabilityLocations),
-    breaks: many(availabilityBreaks),
+export const availabilityRelations = relations(availability, ({ one, many }) => ({
+  instructor: one(instructors, {
+    fields: [availability.instructorId],
+    references: [instructors.id],
   }),
-);
+  locations: many(availabilityLocations),
+  breaks: many(availabilityBreaks),
+}));
 
-export const availabilityLocationsRelations = relations(
-  availabilityLocations,
-  ({ one }) => ({
-    availability: one(availability, {
-      fields: [availabilityLocations.availabilityId],
-      references: [availability.id],
-    }),
+export const availabilityLocationsRelations = relations(availabilityLocations, ({ one }) => ({
+  availability: one(availability, {
+    fields: [availabilityLocations.availabilityId],
+    references: [availability.id],
   }),
-);
+}));
 
-export const availabilityBreaksRelations = relations(
-  availabilityBreaks,
-  ({ one }) => ({
-    availability: one(availability, {
-      fields: [availabilityBreaks.availabilityId],
-      references: [availability.id],
-    }),
+export const availabilityBreaksRelations = relations(availabilityBreaks, ({ one }) => ({
+  availability: one(availability, {
+    fields: [availabilityBreaks.availabilityId],
+    references: [availability.id],
   }),
-);
+}));
 
-export const availabilityBlocksRelations = relations(
-  availabilityBlocks,
-  ({ one }) => ({
-    instructor: one(instructors, {
-      fields: [availabilityBlocks.instructorId],
-      references: [instructors.id],
-    }),
+export const availabilityBlocksRelations = relations(availabilityBlocks, ({ one }) => ({
+  instructor: one(instructors, {
+    fields: [availabilityBlocks.instructorId],
+    references: [instructors.id],
   }),
-);
+}));
 
 export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   school: one(schools, {
@@ -183,20 +169,17 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   payments: many(payments),
 }));
 
-export const bookingFormsRelations = relations(
-  bookingForms,
-  ({ one, many }) => ({
-    school: one(schools, {
-      fields: [bookingForms.schoolId],
-      references: [schools.id],
-    }),
-    service: one(services, {
-      fields: [bookingForms.serviceId],
-      references: [services.id],
-    }),
-    formFields: many(formFields),
+export const bookingFormsRelations = relations(bookingForms, ({ one, many }) => ({
+  school: one(schools, {
+    fields: [bookingForms.schoolId],
+    references: [schools.id],
   }),
-);
+  service: one(services, {
+    fields: [bookingForms.serviceId],
+    references: [services.id],
+  }),
+  formFields: many(formFields),
+}));
 
 export const formFieldsRelations = relations(formFields, ({ one, many }) => ({
   bookingForm: one(bookingForms, {
