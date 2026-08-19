@@ -9,7 +9,7 @@ interface ISuprsendEvent {
 
 interface ISuprsendUserInstance {
   add_email(email: string): void;
-  save(): Promise<any>;
+  save(): Promise<unknown>;
 }
 
 interface ISuprsendClient {

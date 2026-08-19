@@ -43,8 +43,8 @@ export class PublicWebsitesService {
     }
 
     const mergedConfig = {
-      ...(record.baseConfig as Record<string, any>),
-      ...(record.customConfig as Record<string, any>),
+      ...(record.baseConfig as Record<string, unknown>),
+      ...(record.customConfig as Record<string, unknown>),
     };
 
     return {

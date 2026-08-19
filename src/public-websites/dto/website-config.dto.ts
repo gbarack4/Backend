@@ -33,5 +33,5 @@ export class WebsiteConfigDto {
     type: 'object',
     additionalProperties: true,
   })
-  config!: Record<string, any>;
+  config!: Record<string, unknown>;
 }

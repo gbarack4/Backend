@@ -15,8 +15,8 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Request, Response } from 'express';
 import { Webhook } from 'svix';
 
-import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 import { StudentsService } from '@/students/students.service';
 
 import { UsersService } from './users.service';
@@ -45,7 +45,7 @@ export class WebhooksController {
 
   constructor(
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
     private readonly studentsService: StudentsService,
@@ -214,7 +214,7 @@ export class WebhooksController {
     } catch (error: unknown) {
       console.error('RAW DB ERROR:', error);
 
-      const dbError = error as Record<string, any>;
+      const dbError = error as { code?: string; detail?: string };
       if (dbError.code) {
         this.logger.error(`Postgres Error Code: ${dbError.code}`);
       }

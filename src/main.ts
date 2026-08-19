@@ -10,6 +10,7 @@ import { DB_CONNECTION } from '@/database/database.module';
 
 import { AppModule } from './app.module';
 import { TrimPipe } from './common/pipes/trim.pipe';
+import { FullSchema } from './database/database.types';
 
 const logger = new Logger('Bootstrap');
 
@@ -21,7 +22,7 @@ const domainCache = new Map<string, { valid: boolean; expiresAt: number }>();
 const inFlightChecks = new Map<string, Promise<boolean>>();
 
 async function isCustomDomainAllowed(
-  db: NodePgDatabase<typeof schema>,
+  db: NodePgDatabase<FullSchema>,
   hostname: string,
 ): Promise<boolean> {
   if (hostname.length > 255) {
@@ -108,7 +109,7 @@ async function bootstrap() {
     }),
   );
 
-  const db = app.get<NodePgDatabase<typeof schema>>(DB_CONNECTION);
+  const db = app.get<NodePgDatabase<FullSchema>>(DB_CONNECTION);
 
   const envOrigins =
     process.env.ALLOWED_ORIGINS?.split(',')

@@ -11,6 +11,7 @@ import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 
 import * as schema from '../../database/schema';
 import { REQUIRE_PERMISSION_KEY } from '../decorators/require-permission.decorator';
@@ -22,7 +23,7 @@ export class SchoolRolesGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
