@@ -3,11 +3,12 @@ import { eq, and } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema';
 import { WebsiteConfigDto } from './dto/website-config.dto';
+import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class PublicWebsitesService {
   constructor(
-    @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   async findByDomain(domain: string): Promise<WebsiteConfigDto | null> {

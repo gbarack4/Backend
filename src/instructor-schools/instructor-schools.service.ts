@@ -8,11 +8,12 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { SuprSendService } from '@/suprsend/suprsend.service';
+import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class InstructorSchoolsService {
   constructor(
-    @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
     private readonly suprSendService: SuprSendService,
   ) {}
 

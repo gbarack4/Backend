@@ -16,6 +16,7 @@ import { APP_DOMAIN_SUFFIX } from './constants/school.constants';
 import { GeocodingService } from '@/location/geocoding.service';
 import { GeocodeResult } from '@/location/types/geocoding.types';
 import { stripStreetNumber } from '@/common/utils/address.util';
+import { DB_CONNECTION } from '@/database/database.module';
 
 function isPostgresError(
   error: unknown,
@@ -28,7 +29,7 @@ export class SchoolSettingsService {
   private readonly logger = new Logger(SchoolSettingsService.name);
 
   constructor(
-    @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
     private readonly geocodingService: GeocodingService,
   ) {}
 

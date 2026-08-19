@@ -11,6 +11,7 @@ import { PublicWebsitesModule } from './public-websites/public-websites.module';
 import { InstructorsModule } from './instructors/instructors.module';
 import { StudentsModule } from './students/students.module';
 import { InstructorSchoolsModule } from './instructor-schools/instructor-schools.module';
+import { AvailabilityModule } from './availability/availability.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { InstructorSchoolsModule } from './instructor-schools/instructor-schools
     InstructorsModule,
     StudentsModule,
     InstructorSchoolsModule,
+    AvailabilityModule,
   ],
   controllers: [],
   providers: [],

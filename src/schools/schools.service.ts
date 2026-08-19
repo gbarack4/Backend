@@ -8,13 +8,14 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../database/schema';
+import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class SchoolsService {
   private readonly logger = new Logger(SchoolsService.name);
 
   constructor(
-    @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   async getDefaultSchool(userId: string) {

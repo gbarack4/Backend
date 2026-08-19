@@ -4,13 +4,14 @@ import { and, eq, ilike, sql, SQL } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
 import { SchoolSearchResult } from './interfaces/school-search-result.interface';
+import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class SchoolSearchService {
   private readonly logger = new Logger(SchoolSearchService.name);
 
   constructor(
-    @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   async searchSchools(

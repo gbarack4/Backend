@@ -20,6 +20,7 @@ import {
 } from './constants/school.constants';
 import { GeocodingService } from '@/location/geocoding.service';
 import { stripStreetNumber } from '@/common/utils/address.util';
+import { DB_CONNECTION } from '@/database/database.module';
 
 function isPostgresError(
   error: unknown,
@@ -32,7 +33,7 @@ export class SchoolSetupService {
   private readonly logger = new Logger(SchoolSetupService.name);
 
   constructor(
-    @Inject('DB_CONNECTION') private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
     private readonly geocodingService: GeocodingService,
   ) {}
 

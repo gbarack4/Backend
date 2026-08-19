@@ -13,12 +13,13 @@ import * as schema from '../../database/schema';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { REQUIRE_PERMISSION_KEY } from '../decorators/require-permission.decorator';
 import { RequestWithAuth } from '../interfaces/auth.interface';
+import { DB_CONNECTION } from '@/database/database.module';
 
 @Injectable()
 export class SchoolRolesGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    @Inject('DB_CONNECTION')
+    @Inject(DB_CONNECTION)
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
