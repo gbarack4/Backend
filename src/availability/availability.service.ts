@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 
 import * as schema from '../database/schema';
 import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto';
@@ -11,7 +12,7 @@ import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto'
 export class AvailabilityService {
   constructor(
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
   ) {}
 
   async getInstructorAvailability(instructorId: string) {

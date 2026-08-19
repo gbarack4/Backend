@@ -15,6 +15,7 @@ import { inspect } from 'node:util';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 
 import { GOOGLE_ENDPOINTS } from './constants/google.endpoints';
 import {
@@ -38,7 +39,7 @@ export class GoogleService {
 
   constructor(
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
     private readonly configService: ConfigService,
   ) {
     this.googleConfig = {

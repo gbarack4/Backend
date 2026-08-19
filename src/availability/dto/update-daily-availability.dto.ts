@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsString,
   Matches,
@@ -37,6 +38,7 @@ export class UpdateDailyAvailabilityDto {
   endTime?: string;
 
   @IsInt()
+  @IsIn([15, 30, 45], { message: 'Slot interval must be exactly 15, 30, or 45 minutes' })
   slotInterval!: number;
 
   @IsInt()

@@ -11,6 +11,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 import { S3Service } from '@/storage/s3.service';
 
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -21,7 +22,7 @@ export class UsersService {
 
   constructor(
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -35,7 +36,7 @@ export class UsersService {
       phoneNumber?: string;
       address?: string;
     },
-    tx: NodePgDatabase<typeof schema> = this.db,
+    tx: NodePgDatabase<FullSchema> = this.db,
   ) {
     const [user] = await tx
       .insert(schema.users)

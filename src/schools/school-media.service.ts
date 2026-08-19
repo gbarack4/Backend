@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 
 import * as schema from '../database/schema';
 import { S3Service } from '../storage/s3.service';
@@ -21,7 +22,7 @@ export class SchoolMediaService {
   private readonly logger = new Logger(SchoolMediaService.name);
 
   constructor(
-    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<FullSchema>,
     private readonly s3Service: S3Service,
   ) {}
 

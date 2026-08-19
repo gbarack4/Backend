@@ -13,6 +13,7 @@ import slugify from 'slugify';
 
 import { stripStreetNumber } from '@/common/utils/address.util';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 import { GeocodingService } from '@/location/geocoding.service';
 import { GeocodeResult } from '@/location/types/geocoding.types';
 
@@ -29,7 +30,7 @@ export class SchoolSettingsService {
   private readonly logger = new Logger(SchoolSettingsService.name);
 
   constructor(
-    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<FullSchema>,
     private readonly geocodingService: GeocodingService,
   ) {}
 

@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 
-import * as schema from './schema';
+import { fullSchema } from './database.types';
 
 export const DB_CONNECTION = 'DB_CONNECTION' as const;
 
@@ -34,7 +34,7 @@ export const DB_CONNECTION = 'DB_CONNECTION' as const;
           ssl: isLocal ? false : { rejectUnauthorized: false },
         });
 
-        const db = drizzle(pool, { schema });
+        const db = drizzle(pool, { schema: fullSchema });
 
         try {
           logger.log('Starting database migrations...');

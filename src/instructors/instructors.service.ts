@@ -11,6 +11,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 import { instructorOnboardingDrafts } from '@/database/schema';
 import { S3Service } from '@/storage/s3.service';
 
@@ -18,6 +19,7 @@ import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
 import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { UpsertDraftDto } from './dto/upsert-draft.dto';
+import { InstructorDocuments } from './types/instructor-documents.type';
 
 @Injectable()
 export class InstructorsService {
@@ -25,7 +27,7 @@ export class InstructorsService {
 
   constructor(
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -186,10 +188,10 @@ export class InstructorsService {
       });
 
       if (instructor) {
-        const updatedDocuments = {
-          ...(instructor.documents as Record<string, any>),
+        const updatedDocuments: InstructorDocuments = {
+          ...instructor.documents,
           [documentType]: uploadResult.fileUrl,
-        };
+        } as InstructorDocuments;
 
         await this.db
           .update(schema.instructors)

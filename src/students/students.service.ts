@@ -4,12 +4,13 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 
 @Injectable()
 export class StudentsService {
   constructor(
     @Inject(DB_CONNECTION)
-    private readonly db: NodePgDatabase<typeof schema>,
+    private readonly db: NodePgDatabase<FullSchema>,
   ) {}
 
   async syncStudentWithSchool(clerkUserId: string, schoolId: string) {
@@ -44,7 +45,7 @@ export class StudentsService {
       phone?: string | null;
       avatarUrl?: string | null;
     },
-    tx: NodePgDatabase<typeof schema> = this.db,
+    tx: NodePgDatabase<FullSchema> = this.db,
   ) {
     const [student] = await tx
       .insert(schema.students)
@@ -118,7 +119,7 @@ export class StudentsService {
   async getStudentByUserIdAndSchool(
     userId: string,
     schoolId: string,
-    tx: NodePgDatabase<typeof schema> = this.db,
+    tx: NodePgDatabase<FullSchema> = this.db,
   ) {
     const [student] = await tx
       .select({

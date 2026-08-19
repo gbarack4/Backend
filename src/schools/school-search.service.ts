@@ -3,6 +3,7 @@ import { and, eq, ilike, sql, SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 
 import * as schema from '../database/schema';
 import { SearchSchoolsDto } from './dto/search-schools.dto';
@@ -12,7 +13,7 @@ import { SchoolSearchResult } from './interfaces/school-search-result.interface'
 export class SchoolSearchService {
   private readonly logger = new Logger(SchoolSearchService.name);
 
-  constructor(@Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>) {}
+  constructor(@Inject(DB_CONNECTION) private readonly db: NodePgDatabase<FullSchema>) {}
 
   async searchSchools(query: SearchSchoolsDto, userId?: string): Promise<SchoolSearchResult[]> {
     this.logger.debug(`Searching schools with params: ${JSON.stringify(query)}`);

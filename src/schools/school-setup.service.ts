@@ -11,11 +11,12 @@ import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import slugify from 'slugify';
 
+import * as schema from '@/database/schema';
 import { stripStreetNumber } from '@/common/utils/address.util';
 import { DB_CONNECTION } from '@/database/database.module';
+import { FullSchema } from '@/database/database.types';
 import { GeocodingService } from '@/location/geocoding.service';
 
-import * as schema from '../database/schema';
 import {
   DEFAULT_LOCATION_NAME,
   DEFAULT_TEMPLATE_NAME,
@@ -33,7 +34,7 @@ export class SchoolSetupService {
   private readonly logger = new Logger(SchoolSetupService.name);
 
   constructor(
-    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(DB_CONNECTION) private readonly db: NodePgDatabase<FullSchema>,
     private readonly geocodingService: GeocodingService,
   ) {}
 

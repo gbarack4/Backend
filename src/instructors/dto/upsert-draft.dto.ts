@@ -13,5 +13,5 @@ export class UpsertDraftDto {
     additionalProperties: true,
   })
   @IsObject()
-  formData!: Record<string, any>;
+  formData!: Record<string, unknown>;
 }

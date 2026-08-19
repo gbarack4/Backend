@@ -18,6 +18,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { InstructorDocuments } from '@/instructors/types/instructor-documents.type';
+
 export const instructorSchools = pgTable(
   'instructor_schools',
   {
@@ -188,6 +190,7 @@ export const services = pgTable(
     description: text(),
     priceType: text('price_type').notNull(),
     basePrice: numeric('base_price', { precision: 10, scale: 2 }),
+    durationMinutes: integer('duration_minutes').default(60).notNull(),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -314,7 +317,7 @@ export const instructors = pgTable(
     suburb: text('suburb'),
     state: text('state'),
     postcode: text('postcode'),
-    emergencyContact: jsonb('emergency_contact'),
+    emergencyContact: jsonb('emergency_contact').$type<{ name: string; phone: string }>(),
     driverLicenceNumber: text('driver_licence_number'),
     driverLicenceExpiry: text('driver_licence_expiry'),
     instructorAccreditationNumber: text('instructor_accreditation_number'),
@@ -322,7 +325,7 @@ export const instructors = pgTable(
     yearsOfExperience: integer('years_of_experience'),
     transmissionType: text('transmission_type'),
     languagesSpoken: text('languages_spoken'),
-    documents: jsonb('documents'),
+    documents: jsonb('documents').$type<InstructorDocuments>(),
     status: text().default('active').notNull(),
     createdAt: timestamp('created_at', {
       withTimezone: true,
