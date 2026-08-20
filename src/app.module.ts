@@ -9,6 +9,7 @@ import { GoogleModule } from './google/google.module';
 import { InstructorSchoolsModule } from './instructor-schools/instructor-schools.module';
 import { InstructorsModule } from './instructors/instructors.module';
 import { PublicWebsitesModule } from './public-websites/public-websites.module';
+import { SchoolPackagesModule } from './school-packages/school-packages.module';
 import { SchoolsModule } from './schools/schools.module';
 import { StorageModule } from './storage/storage.module';
 import { StudentsModule } from './students/students.module';
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module';
     StudentsModule,
     InstructorSchoolsModule,
     AvailabilityModule,
+    SchoolPackagesModule,
   ],
   controllers: [],
   providers: [],

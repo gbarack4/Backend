@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 
 import { Roles } from '@/auth/decorators/roles.decorator';
+import { Role } from '@/auth/enums/role.enum';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
@@ -20,7 +21,7 @@ import { InstructorSchoolsService } from './instructor-schools.service';
 
 @Controller('school-admin')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard, SchoolRolesGuard)
-@Roles('owner', 'admin')
+@Roles(Role.Owner, Role.Admin)
 export class SchoolAdminController {
   constructor(private readonly service: InstructorSchoolsService) {}
 
