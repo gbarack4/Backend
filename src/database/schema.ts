@@ -139,6 +139,7 @@ export const schools = pgTable(
     timezone: text().default('UTC').notNull(),
     dateFormat: text('date_format').default('DD/MM/YYYY').notNull(),
     timeFormat: text('time_format').default('24h').notNull(),
+    hourlyRate: numeric('hourly_rate', { precision: 10, scale: 2 }),
     subscriptionStatus: text('subscription_status').default('trialing').notNull(),
     trialEndsAt: timestamp('trial_ends_at', {
       withTimezone: true,
@@ -982,3 +983,93 @@ export const instructorOnboardingDrafts = pgTable('instructor_onboarding_drafts'
   formData: jsonb('form_data').notNull().default({}),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const locationGroups = pgTable(
+  'location_groups',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid('school_id').notNull(),
+    name: text().notNull(),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'location_groups_school_id_fkey',
+    }).onDelete('cascade'),
+    pgPolicy('isolate_location_groups', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+  ],
+).enableRLS();
+
+export const locationGroupSuburbs = pgTable(
+  'location_group_suburbs',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    groupId: uuid('group_id').notNull(),
+    suburb: text('suburb').notNull(),
+    postcode: text('postcode'),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.groupId],
+      foreignColumns: [locationGroups.id],
+      name: 'location_group_suburbs_group_id_fkey',
+    }).onDelete('cascade'),
+  ],
+);
+
+export const packages = pgTable(
+  'packages',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid('school_id').notNull(),
+    locationGroupId: uuid('location_group_id').notNull(),
+    name: text().notNull(),
+    durationMinutes: integer('duration_minutes').notNull(),
+    price: numeric({ precision: 10, scale: 2 }).notNull(),
+    status: text().default('active').notNull(),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'packages_school_id_fkey',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.locationGroupId],
+      foreignColumns: [locationGroups.id],
+      name: 'packages_location_group_id_fkey',
+    }).onDelete('restrict'),
+    check(
+      'packages_status_check',
+      sql`status = ANY (ARRAY['active'::text, 'inactive'::text, 'archived'::text])`,
+    ),
+    pgPolicy('isolate_packages', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+  ],
+).enableRLS();

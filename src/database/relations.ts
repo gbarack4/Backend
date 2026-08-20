@@ -15,8 +15,11 @@ import {
   instructorSchools,
   invites,
   invoices,
+  locationGroups,
+  locationGroupSuburbs,
   locations,
   notifications,
+  packages,
   payments,
   pricingRules,
   reviews,
@@ -62,6 +65,8 @@ export const schoolsRelations = relations(schools, ({ many }) => ({
   invites: many(invites),
   coupons: many(coupons),
   activityLogs: many(activityLogs),
+  locationGroups: many(locationGroups),
+  packages: many(packages),
 }));
 
 export const locationsRelations = relations(locations, ({ one, many }) => ({
@@ -266,5 +271,32 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   school: one(schools, {
     fields: [activityLogs.schoolId],
     references: [schools.id],
+  }),
+}));
+
+export const locationGroupsRelations = relations(locationGroups, ({ one, many }) => ({
+  school: one(schools, {
+    fields: [locationGroups.schoolId],
+    references: [schools.id],
+  }),
+  suburbs: many(locationGroupSuburbs),
+  packages: many(packages),
+}));
+
+export const locationGroupSuburbsRelations = relations(locationGroupSuburbs, ({ one }) => ({
+  locationGroup: one(locationGroups, {
+    fields: [locationGroupSuburbs.groupId],
+    references: [locationGroups.id],
+  }),
+}));
+
+export const packagesRelations = relations(packages, ({ one }) => ({
+  school: one(schools, {
+    fields: [packages.schoolId],
+    references: [schools.id],
+  }),
+  locationGroup: one(locationGroups, {
+    fields: [packages.locationGroupId],
+    references: [locationGroups.id],
   }),
 }));
