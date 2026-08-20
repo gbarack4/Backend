@@ -6,7 +6,7 @@ import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 
 import * as schema from '../database/schema';
-import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto';
+import { UpdateBulkAvailabilityDto } from './dto/update-bulk-availability.dto';
 
 @Injectable()
 export class AvailabilityService {
@@ -25,57 +25,62 @@ export class AvailabilityService {
     });
   }
 
-  async updateDailyAvailability(instructorId: string, dto: UpdateDailyAvailabilityDto) {
+  async updateBulkAvailability(instructorId: string, dto: UpdateBulkAvailabilityDto) {
     return await this.db.transaction(async (tx) => {
-      const [availabilityRecord] = await tx
-        .insert(schema.availability)
-        .values({
-          instructorId,
-          dayOfWeek: dto.dayOfWeek,
-          isWorking: dto.isWorking,
-          startTime: dto.isWorking ? dto.startTime : null,
-          endTime: dto.isWorking ? dto.endTime : null,
-          slotInterval: dto.slotInterval,
-          travelTime: dto.travelTime,
-        })
-        .onConflictDoUpdate({
-          target: [schema.availability.instructorId, schema.availability.dayOfWeek],
-          set: {
-            isWorking: dto.isWorking,
-            startTime: dto.isWorking ? dto.startTime : null,
-            endTime: dto.isWorking ? dto.endTime : null,
-            slotInterval: dto.slotInterval,
-            travelTime: dto.travelTime,
-          },
-        })
-        .returning({ id: schema.availability.id });
+      const updatedIds: string[] = [];
 
-      const availabilityId = availabilityRecord.id;
+      for (const day of dto.days) {
+        const [availabilityRecord] = await tx
+          .insert(schema.availability)
+          .values({
+            instructorId,
+            dayOfWeek: day.dayOfWeek,
+            isWorking: day.isWorking,
+            startTime: day.isWorking ? day.startTime : null,
+            endTime: day.isWorking ? day.endTime : null,
+            slotInterval: day.slotInterval,
+            travelTime: day.travelTime,
+          })
+          .onConflictDoUpdate({
+            target: [schema.availability.instructorId, schema.availability.dayOfWeek],
+            set: {
+              isWorking: day.isWorking,
+              startTime: day.isWorking ? day.startTime : null,
+              endTime: day.isWorking ? day.endTime : null,
+              slotInterval: day.slotInterval,
+              travelTime: day.travelTime,
+            },
+          })
+          .returning({ id: schema.availability.id });
 
-      await tx
-        .delete(schema.availabilityLocations)
-        .where(eq(schema.availabilityLocations.availabilityId, availabilityId));
-      await tx
-        .delete(schema.availabilityBreaks)
-        .where(eq(schema.availabilityBreaks.availabilityId, availabilityId));
+        const availabilityId = availabilityRecord.id;
+        updatedIds.push(availabilityId);
 
-      if (dto.isWorking && dto.locations?.length > 0) {
         await tx
-          .insert(schema.availabilityLocations)
-          .values(dto.locations.map((suburb) => ({ availabilityId, suburb })));
+          .delete(schema.availabilityLocations)
+          .where(eq(schema.availabilityLocations.availabilityId, availabilityId));
+        await tx
+          .delete(schema.availabilityBreaks)
+          .where(eq(schema.availabilityBreaks.availabilityId, availabilityId));
+
+        if (day.isWorking && day.locations?.length > 0) {
+          await tx
+            .insert(schema.availabilityLocations)
+            .values(day.locations.map((suburb) => ({ availabilityId, suburb })));
+        }
+
+        if (day.isWorking && day.breaks?.length > 0) {
+          await tx.insert(schema.availabilityBreaks).values(
+            day.breaks.map((b) => ({
+              availabilityId,
+              startTime: b.startTime,
+              endTime: b.endTime,
+            })),
+          );
+        }
       }
 
-      if (dto.isWorking && dto.breaks?.length > 0) {
-        await tx.insert(schema.availabilityBreaks).values(
-          dto.breaks.map((b) => ({
-            availabilityId,
-            startTime: b.startTime,
-            endTime: b.endTime,
-          })),
-        );
-      }
-
-      return { success: true, availabilityId };
+      return { success: true, updatedIds };
     });
   }
 }

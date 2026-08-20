@@ -8,7 +8,7 @@ import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 
 import { AvailabilityService } from './availability.service';
-import { UpdateDailyAvailabilityDto } from './dto/update-daily-availability.dto';
+import { UpdateBulkAvailabilityDto } from './dto/update-bulk-availability.dto';
 
 @Controller('availability')
 export class AvailabilityController {
@@ -21,13 +21,13 @@ export class AvailabilityController {
     return this.availabilityService.getInstructorAvailability(instructorId);
   }
 
-  @Put('daily')
+  @Put('bulk')
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
   @Roles(Role.Instructor)
-  async updateDaily(
-    @Body() dto: UpdateDailyAvailabilityDto,
+  async updateBulk(
+    @Body() dto: UpdateBulkAvailabilityDto,
     @CurrentInstructorId() instructorId: string,
   ) {
-    return this.availabilityService.updateDailyAvailability(instructorId, dto);
+    return this.availabilityService.updateBulkAvailability(instructorId, dto);
   }
 }
