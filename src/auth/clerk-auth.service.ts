@@ -3,7 +3,7 @@ import type { JwtPayload } from '@clerk/types';
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 
-import clerkConfig from '../config/clerk.config';
+import clerkConfig from '@/config/clerk.config';
 
 @Injectable()
 export class ClerkAuthService {

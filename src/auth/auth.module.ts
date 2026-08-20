@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 
-import { UsersModule } from '../users/users.module';
+import { UsersModule } from '@/users/users.module';
+
 import { AuthController } from './auth.controller';
 import { ClerkAuthService } from './clerk-auth.service';
 import { ClerkAuthGuard } from './guards/clerk-auth.guard';
