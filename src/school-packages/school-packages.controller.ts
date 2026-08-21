@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -19,6 +20,7 @@ import { SchoolRolesGuard } from '@/auth/guards/school-roles.guard';
 import { CreateLocationGroupDto } from './dto/create-location-group.dto';
 import { CreatePackageDto } from './dto/create-package.dto';
 import { UpdateHourlyRateDto } from './dto/update-hourly-rate.dto';
+import { UpdateLocationGroupDto } from './dto/update-location-group.dto';
 import { SchoolPackagesService } from './school-packages.service';
 
 @Controller('school-admin')
@@ -58,5 +60,53 @@ export class SchoolPackagesController {
     @Body() dto: UpdateHourlyRateDto,
   ) {
     return this.schoolPackagesService.updateHourlyRate(schoolId, dto.hourlyRate);
+  }
+
+  @Patch('location-groups/:id')
+  async updateLocationGroup(
+    @Headers('x-school-id') schoolId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateLocationGroupDto,
+  ) {
+    return this.schoolPackagesService.updateLocationGroup(schoolId, id, dto);
+  }
+
+  @Delete('location-groups/:id')
+  async deleteLocationGroup(
+    @Headers('x-school-id') schoolId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.schoolPackagesService.deleteLocationGroup(schoolId, id);
+  }
+
+  @Get('schools/hourly-rate/:schoolId')
+  async getHourlyRate(@Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string) {
+    return this.schoolPackagesService.getHourlyRate(schoolId);
+  }
+
+  @Patch('packages/:id')
+  async updatePackage(
+    @Headers('x-school-id') schoolId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: Partial<CreatePackageDto>,
+  ) {
+    return this.schoolPackagesService.updatePackage(schoolId, id, dto);
+  }
+
+  @Patch('packages/:id/status')
+  async updatePackageStatus(
+    @Headers('x-school-id') schoolId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body('status') status: 'active' | 'archived',
+  ) {
+    return this.schoolPackagesService.updatePackageStatus(schoolId, id, status);
+  }
+
+  @Delete('packages/:id')
+  async deletePackage(
+    @Headers('x-school-id') schoolId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.schoolPackagesService.deletePackage(schoolId, id);
   }
 }
