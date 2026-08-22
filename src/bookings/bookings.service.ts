@@ -8,12 +8,21 @@ import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
-import { BusyInterval, SlotResult } from './types/booking-slots.types';
+import { BusyInterval, SlotResult } from './types/bookings.types';
 
-type AvailabilityRecord = Awaited<ReturnType<SlotsService['findAvailabilities']>>[number];
+type AvailabilityRecord = Awaited<ReturnType<BookingsService['findAvailabilities']>>[number];
+
+type AvailabilityWithTime = AvailabilityRecord & {
+  startTime: string;
+  endTime: string;
+};
+
+function isValidAvailability(av: AvailabilityRecord): av is AvailabilityWithTime {
+  return av.startTime !== null && av.endTime !== null && av.locations.length > 0;
+}
 
 @Injectable()
-export class SlotsService {
+export class BookingsService {
   constructor(
     @Inject(DB_CONNECTION)
     private readonly db: NodePgDatabase<FullSchema>,
@@ -52,9 +61,7 @@ export class SlotsService {
       endOfDayZoned,
     );
 
-    const validAvailabilities = rawAvailabilities.filter(
-      (av) => av.locations && av.locations.length > 0,
-    );
+    const validAvailabilities = rawAvailabilities.filter(isValidAvailability);
 
     if (validAvailabilities.length === 0) {
       return [];
@@ -104,7 +111,7 @@ export class SlotsService {
   }
 
   private calculateSlots(
-    availabilities: AvailabilityRecord[],
+    availabilities: AvailabilityWithTime[],
     durationMinutes: number,
     baseDate: Date,
     timezone: string,
@@ -117,8 +124,6 @@ export class SlotsService {
       toDate(`${dateString}T${timeStr}`, { timeZone: timezone }).getTime();
 
     for (const av of availabilities) {
-      if (!av.startTime || !av.endTime) continue;
-
       const busyIntervals = this.buildBusyIntervals(av, parseTime);
 
       const instructorSlots = this.generateInstructorSlots(
@@ -166,7 +171,7 @@ export class SlotsService {
   }
 
   private generateInstructorSlots(
-    av: AvailabilityRecord,
+    av: AvailabilityWithTime,
     busyIntervals: BusyInterval[],
     durationMinutes: number,
     parseTime: (t: string) => number,
@@ -176,8 +181,8 @@ export class SlotsService {
     const durationMs = durationMinutes * 60 * 1000;
     const slotIntervalMs = av.slotInterval * 60 * 1000;
 
-    const endOfDayMs = parseTime(av.endTime!);
-    let currentMs = parseTime(av.startTime!);
+    const endOfDayMs = parseTime(av.endTime);
+    let currentMs = parseTime(av.startTime);
 
     while (currentMs + durationMs <= endOfDayMs) {
       const slotStart = currentMs;
