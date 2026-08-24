@@ -520,22 +520,35 @@ export const bookings = pgTable(
   'bookings',
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
+
     schoolId: uuid('school_id').notNull(),
     studentId: uuid('student_id'),
     instructorId: uuid('instructor_id').notNull(),
-    serviceId: uuid('service_id').notNull(),
-    locationId: uuid('location_id'),
+
+    packageId: uuid('package_id').notNull(),
+
+    pickupSuburb: text('pickup_suburb').notNull(),
+    pickupPostcode: text('pickup_postcode'),
+
     startDatetime: timestamp('start_datetime', {
       withTimezone: true,
       mode: 'string',
     }).notNull(),
+
     endDatetime: timestamp('end_datetime', {
       withTimezone: true,
       mode: 'string',
     }).notNull(),
+
     status: text().default('pending').notNull(),
-    totalPrice: numeric('total_price', { precision: 10, scale: 2 }),
+
+    totalPrice: numeric('total_price', {
+      precision: 10,
+      scale: 2,
+    }),
+
     notes: text(),
+
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -546,49 +559,65 @@ export const bookings = pgTable(
       'btree',
       table.instructorId.asc().nullsLast().op('uuid_ops'),
     ),
+
     index('idx_bookings_school_id').using('btree', table.schoolId.asc().nullsLast().op('uuid_ops')),
+
     foreignKey({
       columns: [table.schoolId],
       foreignColumns: [schools.id],
       name: 'bookings_school_id_fkey',
     }).onDelete('cascade'),
+
     foreignKey({
       columns: [table.studentId],
       foreignColumns: [students.id],
       name: 'bookings_student_id_fkey',
     }).onDelete('set null'),
+
     foreignKey({
       columns: [table.instructorId],
       foreignColumns: [instructors.id],
       name: 'bookings_instructor_id_fkey',
     }).onDelete('restrict'),
+
     foreignKey({
-      columns: [table.serviceId],
-      foreignColumns: [services.id],
-      name: 'bookings_service_id_fkey',
+      columns: [table.packageId],
+      foreignColumns: [packages.id],
+      name: 'bookings_package_id_fkey',
     }).onDelete('restrict'),
-    foreignKey({
-      columns: [table.locationId],
-      foreignColumns: [locations.id],
-      name: 'bookings_location_id_fkey',
-    }).onDelete('set null'),
+
     pgPolicy('isolate_bookings', {
       as: 'permissive',
       for: 'all',
       to: ['public'],
       using: sql`
         (school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)
-        OR 
+        OR
         (instructor_id IN (
-          SELECT id FROM instructors 
-          WHERE user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid
+          SELECT id
+          FROM instructors
+          WHERE user_id = (
+            NULLIF(
+              current_setting('app.current_user_id'::text, true),
+              ''
+            )
+          )::uuid
         ))
       `,
     }),
+
     check(
       'bookings_status_check',
-      sql`status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'completed'::text, 'cancelled'::text])`,
+      sql`status = ANY (
+        ARRAY[
+          'pending'::text,
+          'confirmed'::text,
+          'completed'::text,
+          'cancelled'::text
+        ]
+      )`,
     ),
+
     check('bookings_check', sql`end_datetime > start_datetime`),
   ],
 );

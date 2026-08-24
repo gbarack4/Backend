@@ -69,12 +69,11 @@ export const schoolsRelations = relations(schools, ({ many }) => ({
   packages: many(packages),
 }));
 
-export const locationsRelations = relations(locations, ({ one, many }) => ({
+export const locationsRelations = relations(locations, ({ one }) => ({
   school: one(schools, {
     fields: [locations.schoolId],
     references: [schools.id],
   }),
-  bookings: many(bookings),
 }));
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
@@ -82,7 +81,6 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
     fields: [services.schoolId],
     references: [schools.id],
   }),
-  bookings: many(bookings),
   bookingForms: many(bookingForms),
 }));
 
@@ -153,22 +151,22 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     fields: [bookings.schoolId],
     references: [schools.id],
   }),
+
   student: one(students, {
     fields: [bookings.studentId],
     references: [students.id],
   }),
+
   instructor: one(instructors, {
     fields: [bookings.instructorId],
     references: [instructors.id],
   }),
-  service: one(services, {
-    fields: [bookings.serviceId],
-    references: [services.id],
+
+  package: one(packages, {
+    fields: [bookings.packageId],
+    references: [packages.id],
   }),
-  location: one(locations, {
-    fields: [bookings.locationId],
-    references: [locations.id],
-  }),
+
   invoices: many(invoices),
   reviews: many(reviews),
   payments: many(payments),
@@ -290,7 +288,7 @@ export const locationGroupSuburbsRelations = relations(locationGroupSuburbs, ({ 
   }),
 }));
 
-export const packagesRelations = relations(packages, ({ one }) => ({
+export const packagesRelations = relations(packages, ({ one, many }) => ({
   school: one(schools, {
     fields: [packages.schoolId],
     references: [schools.id],
@@ -299,4 +297,5 @@ export const packagesRelations = relations(packages, ({ one }) => ({
     fields: [packages.locationGroupId],
     references: [locationGroups.id],
   }),
+  bookings: many(bookings),
 }));

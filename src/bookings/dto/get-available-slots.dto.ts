@@ -10,5 +10,5 @@ export class GetAvailableSlotsDto {
 
   @IsUUID('4', { message: 'serviceId must be a valid UUID' })
   @IsNotEmpty()
-  serviceId!: string;
+  packageId!: string;
 }

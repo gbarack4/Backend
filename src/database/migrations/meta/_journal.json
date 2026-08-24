@@ -225,6 +225,13 @@
       "when": 1787257097246,
       "tag": "0031_add_location_groups_and_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787566386516,
+      "tag": "0032_update_bookings_to_packages_and_suburbs",
+      "breakpoints": true
     }
   ]
 }

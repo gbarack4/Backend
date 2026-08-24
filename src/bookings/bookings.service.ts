@@ -1,12 +1,13 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { and, eq, gte, lt, ne } from 'drizzle-orm';
+import { and, eq, gt, gte, lt, ne } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 
+import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
 import { BusyInterval, SlotResult } from './types/bookings.types';
 
@@ -29,23 +30,23 @@ export class BookingsService {
   ) {}
 
   async getAvailableSlots(dto: GetAvailableSlotsDto) {
-    const service = await this.db.query.services.findFirst({
-      where: eq(schema.services.id, dto.serviceId),
+    const bookingPackage = await this.db.query.packages.findFirst({
+      where: eq(schema.packages.id, dto.packageId),
     });
 
-    if (!service) {
-      throw new NotFoundException('Service not found');
+    if (!bookingPackage) {
+      throw new NotFoundException('Package not found');
     }
 
     const school = await this.db.query.schools.findFirst({
-      where: eq(schema.schools.id, service.schoolId),
+      where: eq(schema.schools.id, bookingPackage.schoolId),
     });
 
     if (!school) {
       throw new NotFoundException('School not found');
     }
 
-    const durationMinutes = service.durationMinutes;
+    const durationMinutes = bookingPackage.durationMinutes;
     const timezone = school.timezone;
 
     const startOfDayZoned = toDate(`${dto.date}T00:00:00`, { timeZone: timezone });
@@ -208,5 +209,56 @@ export class BookingsService {
     }
 
     return slots;
+  }
+  async createBooking(userId: string, schoolId: string, dto: CreateBookingDto) {
+    const bookingPackage = await this.db.query.packages.findFirst({
+      where: and(eq(schema.packages.id, dto.packageId), eq(schema.packages.schoolId, schoolId)),
+    });
+
+    if (!bookingPackage) {
+      throw new NotFoundException('Package not found');
+    }
+
+    const student = await this.db.query.students.findFirst({
+      where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const overlappingBooking = await this.db.query.bookings.findFirst({
+      where: and(
+        eq(schema.bookings.instructorId, dto.instructorId),
+        ne(schema.bookings.status, 'cancelled'),
+        lt(schema.bookings.startDatetime, dto.endDatetime),
+        gt(schema.bookings.endDatetime, dto.startDatetime),
+      ),
+    });
+
+    if (overlappingBooking) {
+      throw new BadRequestException(
+        'This slot has just been booked by someone else. Please choose another time.',
+      );
+    }
+
+    const [newBooking] = await this.db
+      .insert(schema.bookings)
+      .values({
+        schoolId,
+        studentId: student.id,
+        instructorId: dto.instructorId,
+        packageId: dto.packageId,
+        pickupSuburb: dto.pickupSuburb,
+        pickupPostcode: dto.pickupPostcode,
+        startDatetime: dto.startDatetime,
+        endDatetime: dto.endDatetime,
+        totalPrice: bookingPackage.price,
+        notes: dto.notes,
+        status: 'pending',
+      })
+      .returning();
+
+    return newBooking;
   }
 }
