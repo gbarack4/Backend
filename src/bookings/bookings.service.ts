@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { and, eq, gt, gte, ilike, inArray, lt, ne, or } from 'drizzle-orm';
+import { and, eq, gt, ilike, inArray, lt, ne, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -52,13 +52,23 @@ export class BookingsService {
     }
 
     const durationMinutes = bookingPackage.durationMinutes;
-    const timezone = school.timezone;
 
-    const startOfDayZoned = toDate(`${dto.date}T00:00:00`, { timeZone: timezone });
-    const endOfDayZoned = toDate(`${dto.date}T23:59:59.999`, { timeZone: timezone });
+    const timezone =
+      school.timezone.toLowerCase() === 'sydney' ? 'Australia/Sydney' : school.timezone;
 
-    const dayOfWeekStr = formatInTimeZone(startOfDayZoned, timezone, 'i');
-    const targetDayOfWeek: number = dayOfWeekStr === '7' ? 0 : Number.parseInt(dayOfWeekStr, 10);
+    const startOfDayZoned = toDate(`${dto.date}T00:00:00`, {
+      timeZone: timezone,
+    });
+
+    const endOfDayZoned = toDate(`${dto.date}T23:59:59.999`, {
+      timeZone: timezone,
+    });
+
+    if (Number.isNaN(startOfDayZoned.getTime()) || Number.isNaN(endOfDayZoned.getTime())) {
+      throw new BadRequestException(`Invalid date or school timezone: ${timezone}`);
+    }
+
+    const targetDayOfWeek = new Date(`${dto.date}T00:00:00Z`).getUTCDay();
 
     const rawAvailabilities = await this.findAvailabilities(
       dto,
@@ -84,30 +94,35 @@ export class BookingsService {
   ) {
     const startOfSearchDay = startOfDayZoned.toISOString();
     const endOfSearchDay = endOfDayZoned.toISOString();
+    const normalizedSuburb = dto.suburb.trim();
 
     return this.db.query.availability.findMany({
       where: and(
+        eq(schema.availability.instructorId, dto.instructorId),
         eq(schema.availability.dayOfWeek, targetDayOfWeek),
         eq(schema.availability.isWorking, true),
       ),
       with: {
         locations: {
-          where: eq(schema.availabilityLocations.suburb, dto.suburb),
+          where: or(
+            ilike(schema.availabilityLocations.suburb, `%${normalizedSuburb}%`),
+            ilike(schema.availabilityLocations.postcode, `%${normalizedSuburb}%`),
+          ),
         },
         breaks: true,
         instructor: {
           with: {
             bookings: {
               where: and(
-                gte(schema.bookings.startDatetime, startOfSearchDay),
                 lt(schema.bookings.startDatetime, endOfSearchDay),
+                gt(schema.bookings.endDatetime, startOfSearchDay),
                 ne(schema.bookings.status, 'cancelled'),
               ),
             },
             availabilityBlocks: {
               where: and(
-                gte(schema.availabilityBlocks.startDatetime, startOfSearchDay),
                 lt(schema.availabilityBlocks.startDatetime, endOfSearchDay),
+                gt(schema.availabilityBlocks.endDatetime, startOfSearchDay),
               ),
             },
           },
@@ -138,6 +153,7 @@ export class BookingsService {
         durationMinutes,
         parseTime,
         nowMs,
+        timezone,
       );
 
       availableSlots.push(...instructorSlots);
@@ -182,6 +198,7 @@ export class BookingsService {
     durationMinutes: number,
     parseTime: (t: string) => number,
     nowMs: number,
+    timezone: string,
   ): SlotResult[] {
     const slots: SlotResult[] = [];
     const durationMs = durationMinutes * 60 * 1000;
@@ -207,6 +224,8 @@ export class BookingsService {
           },
           startDatetime: new Date(slotStart).toISOString(),
           endDatetime: new Date(slotEnd).toISOString(),
+          startTime: formatInTimeZone(new Date(slotStart), timezone, 'h:mm a'),
+          endTime: formatInTimeZone(new Date(slotEnd), timezone, 'h:mm a'),
         });
       }
 
@@ -215,6 +234,7 @@ export class BookingsService {
 
     return slots;
   }
+
   async createBooking(userId: string, schoolId: string, dto: CreateBookingDto) {
     const bookingPackage = await this.db.query.packages.findFirst({
       where: and(eq(schema.packages.id, dto.packageId), eq(schema.packages.schoolId, schoolId)),
@@ -385,6 +405,8 @@ export class BookingsService {
             instructorId: availability.instructorId,
             startDatetime: new Date(slotStart).toISOString(),
             endDatetime: new Date(slotEnd).toISOString(),
+            startTime: formatInTimeZone(new Date(slotStart), timezone, 'h:mm a'),
+            endTime: formatInTimeZone(new Date(slotEnd), timezone, 'h:mm a'),
           });
         }
 
