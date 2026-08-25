@@ -6,10 +6,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, exists, ilike, or, SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
+import { BookingsService } from '@/bookings/bookings.service';
 import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 import { instructorOnboardingDrafts } from '@/database/schema';
@@ -29,6 +30,7 @@ export class InstructorsService {
     @Inject(DB_CONNECTION)
     private readonly db: NodePgDatabase<FullSchema>,
     private readonly s3Service: S3Service,
+    private readonly bookingsService: BookingsService,
   ) {}
 
   private buildUserUpdates(dto: UpdatePersonalInfoDto) {
@@ -354,5 +356,139 @@ export class InstructorsService {
       this.logger.error(`Failed to update vehicle: ${error}`);
       throw new InternalServerErrorException('Failed to update vehicle');
     }
+  }
+
+  async getPublicInstructorById(
+    schoolId: string,
+    instructorId: string,
+    suburb: string,
+    preferredDate: string,
+  ) {
+    const [instructor] = await this.db
+      .select({
+        id: schema.instructors.id,
+        name: schema.instructors.name,
+        phone: schema.instructors.phone,
+        bio: schema.instructors.bio,
+        pricePerHour: schema.instructors.pricePerHour,
+        avatarUrl: schema.instructors.avatarUrl,
+        suburb: schema.instructors.suburb,
+        postcode: schema.instructors.postcode,
+        transmissionType: schema.instructors.transmissionType,
+        schoolId: schema.instructorSchools.schoolId,
+      })
+      .from(schema.instructors)
+      .innerJoin(
+        schema.instructorSchools,
+        eq(schema.instructors.id, schema.instructorSchools.instructorId),
+      )
+      .where(
+        and(
+          eq(schema.instructors.id, instructorId),
+          eq(schema.instructors.status, 'active'),
+          eq(schema.instructorSchools.schoolId, schoolId),
+          eq(schema.instructorSchools.status, 'accepted'),
+        ),
+      )
+      .limit(1);
+
+    if (!instructor) {
+      throw new NotFoundException('Instructor not found');
+    }
+
+    const availableSlots = await this.bookingsService.getAvailableStartSlotsForInstructor(
+      schoolId,
+      instructorId,
+      suburb,
+      preferredDate,
+    );
+
+    return {
+      ...instructor,
+      availableSlots,
+    };
+  }
+
+  async searchPublicInstructors(
+    schoolId: string,
+    suburb: string,
+    transmission: 'manual' | 'automatic' | undefined,
+    preferredDate: string,
+  ) {
+    const conditions: SQL[] = [
+      eq(schema.instructorSchools.schoolId, schoolId),
+      eq(schema.instructorSchools.status, 'accepted'),
+      eq(schema.instructors.status, 'active'),
+    ];
+
+    const normalizedSuburb = suburb.trim();
+
+    const dayOfWeek = new Date(`${preferredDate}T00:00:00Z`).getUTCDay();
+
+    conditions.push(
+      exists(
+        this.db
+          .select({
+            id: schema.availability.id,
+          })
+          .from(schema.availability)
+          .innerJoin(
+            schema.availabilityLocations,
+            eq(schema.availabilityLocations.availabilityId, schema.availability.id),
+          )
+          .where(
+            and(
+              eq(schema.availability.instructorId, schema.instructors.id),
+              eq(schema.availability.isWorking, true),
+              eq(schema.availability.dayOfWeek, dayOfWeek),
+              or(
+                ilike(schema.availabilityLocations.suburb, `%${normalizedSuburb}%`),
+                ilike(schema.availabilityLocations.postcode, `%${normalizedSuburb}%`),
+              ),
+            ),
+          ),
+      ),
+    );
+
+    if (transmission) {
+      conditions.push(
+        or(
+          eq(schema.instructors.transmissionType, transmission),
+          eq(schema.instructors.transmissionType, 'both'),
+        )!,
+      );
+    }
+
+    const instructors = await this.db
+      .select({
+        id: schema.instructors.id,
+        name: schema.instructors.name,
+        phone: schema.instructors.phone,
+        bio: schema.instructors.bio,
+        pricePerHour: schema.instructors.pricePerHour,
+        avatarUrl: schema.instructors.avatarUrl,
+        suburb: schema.instructors.suburb,
+        postcode: schema.instructors.postcode,
+        transmissionType: schema.instructors.transmissionType,
+        schoolId: schema.instructorSchools.schoolId,
+      })
+      .from(schema.instructors)
+      .innerJoin(
+        schema.instructorSchools,
+        eq(schema.instructors.id, schema.instructorSchools.instructorId),
+      )
+      .where(and(...conditions));
+
+    const slotsByInstructor = await this.bookingsService.getAvailableStartSlotsForInstructors(
+      schoolId,
+      instructors.map((instructor) => instructor.id),
+      normalizedSuburb,
+      preferredDate,
+    );
+
+    return instructors.map((instructor) => ({
+      ...instructor,
+      availableSlots: slotsByInstructor[instructor.id] ?? [],
+    }));
   }
 }

@@ -13,3 +13,11 @@ export interface BusyInterval {
   start: number;
   end: number;
 }
+
+export type InstructorStartSlot = {
+  instructorId: string;
+  startDatetime: string;
+  endDatetime: string;
+};
+
+export type InstructorSlotsMap = Record<string, InstructorStartSlot[]>;

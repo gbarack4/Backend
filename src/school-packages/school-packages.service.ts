@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ilike } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -194,5 +194,29 @@ export class SchoolPackagesService {
       .delete(schema.packages)
       .where(and(eq(schema.packages.id, id), eq(schema.packages.schoolId, schoolId)));
     return { success: true };
+  }
+
+  async getPublicPackagesBySuburb(schoolId: string, suburb: string) {
+    const normalizedSuburb = suburb.trim();
+
+    return this.db
+      .select({
+        id: schema.packages.id,
+        name: schema.packages.name,
+        durationMinutes: schema.packages.durationMinutes,
+        price: schema.packages.price,
+      })
+      .from(schema.packages)
+      .innerJoin(
+        schema.locationGroupSuburbs,
+        eq(schema.packages.locationGroupId, schema.locationGroupSuburbs.groupId),
+      )
+      .where(
+        and(
+          eq(schema.packages.schoolId, schoolId),
+          eq(schema.packages.status, 'active'),
+          ilike(schema.locationGroupSuburbs.suburb, `%${normalizedSuburb}%`),
+        ),
+      );
   }
 }

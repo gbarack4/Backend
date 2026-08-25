@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { and, eq, gt, gte, lt, ne } from 'drizzle-orm';
+import { and, eq, gt, gte, ilike, inArray, lt, ne, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -9,7 +9,12 @@ import { FullSchema } from '@/database/database.types';
 
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
-import { BusyInterval, SlotResult } from './types/bookings.types';
+import {
+  BusyInterval,
+  InstructorSlotsMap,
+  InstructorStartSlot,
+  SlotResult,
+} from './types/bookings.types';
 
 type AvailabilityRecord = Awaited<ReturnType<BookingsService['findAvailabilities']>>[number];
 
@@ -260,5 +265,149 @@ export class BookingsService {
       .returning();
 
     return newBooking;
+  }
+
+  async getAvailableStartSlotsForInstructors(
+    schoolId: string,
+    instructorIds: string[],
+    suburb: string,
+    date: string,
+  ): Promise<InstructorSlotsMap> {
+    if (instructorIds.length === 0) {
+      return {};
+    }
+
+    const school = await this.db.query.schools.findFirst({
+      where: eq(schema.schools.id, schoolId),
+    });
+
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('Invalid date');
+    }
+
+    const timezone =
+      school.timezone.toLowerCase() === 'sydney' ? 'Australia/Sydney' : school.timezone;
+    const normalizedSuburb = suburb.trim();
+
+    const targetDayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+
+    const startOfDayZoned = toDate(`${date}T00:00:00`, {
+      timeZone: timezone,
+    });
+
+    const endOfDayZoned = toDate(`${date}T23:59:59.999`, {
+      timeZone: timezone,
+    });
+
+    if (Number.isNaN(startOfDayZoned.getTime()) || Number.isNaN(endOfDayZoned.getTime())) {
+      throw new BadRequestException(`Invalid date or school timezone: ${timezone}`);
+    }
+
+    const startOfSearchDay = startOfDayZoned.toISOString();
+    const endOfSearchDay = endOfDayZoned.toISOString();
+
+    const availabilities = await this.db.query.availability.findMany({
+      where: and(
+        inArray(schema.availability.instructorId, instructorIds),
+        eq(schema.availability.dayOfWeek, targetDayOfWeek),
+        eq(schema.availability.isWorking, true),
+      ),
+      with: {
+        locations: {
+          where: or(
+            ilike(schema.availabilityLocations.suburb, `%${normalizedSuburb}%`),
+            ilike(schema.availabilityLocations.postcode, `%${normalizedSuburb}%`),
+          ),
+        },
+        breaks: true,
+        instructor: {
+          with: {
+            bookings: {
+              where: and(
+                lt(schema.bookings.startDatetime, endOfSearchDay),
+                gt(schema.bookings.endDatetime, startOfSearchDay),
+                ne(schema.bookings.status, 'cancelled'),
+              ),
+            },
+            availabilityBlocks: {
+              where: and(
+                lt(schema.availabilityBlocks.startDatetime, endOfSearchDay),
+                gt(schema.availabilityBlocks.endDatetime, startOfSearchDay),
+              ),
+            },
+          },
+        },
+      },
+    });
+
+    const slotsByInstructor: InstructorSlotsMap = {};
+
+    for (const instructorId of instructorIds) {
+      slotsByInstructor[instructorId] = [];
+    }
+
+    const nowMs = Date.now();
+
+    for (const availability of availabilities) {
+      if (!availability.startTime || !availability.endTime || availability.locations.length === 0) {
+        continue;
+      }
+
+      const parseTime = (time: string) =>
+        toDate(`${date}T${time}`, {
+          timeZone: timezone,
+        }).getTime();
+
+      const busyIntervals = this.buildBusyIntervals(availability, parseTime);
+
+      const slotIntervalMs = availability.slotInterval * 60 * 1000;
+
+      const endTimeMs = parseTime(availability.endTime);
+
+      let currentMs = parseTime(availability.startTime);
+
+      while (currentMs + slotIntervalMs <= endTimeMs) {
+        const slotStart = currentMs;
+        const slotEnd = currentMs + slotIntervalMs;
+
+        const isFuture = slotStart > nowMs;
+
+        const hasOverlap = busyIntervals.some(
+          (busy) => slotStart < busy.end && slotEnd > busy.start,
+        );
+
+        if (isFuture && !hasOverlap) {
+          slotsByInstructor[availability.instructorId].push({
+            instructorId: availability.instructorId,
+            startDatetime: new Date(slotStart).toISOString(),
+            endDatetime: new Date(slotEnd).toISOString(),
+          });
+        }
+
+        currentMs += slotIntervalMs;
+      }
+    }
+
+    return slotsByInstructor;
+  }
+
+  async getAvailableStartSlotsForInstructor(
+    schoolId: string,
+    instructorId: string,
+    suburb: string,
+    date: string,
+  ): Promise<InstructorStartSlot[]> {
+    const slotsByInstructor = await this.getAvailableStartSlotsForInstructors(
+      schoolId,
+      [instructorId],
+      suburb,
+      date,
+    );
+
+    return slotsByInstructor[instructorId] ?? [];
   }
 }
