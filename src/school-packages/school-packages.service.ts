@@ -200,7 +200,7 @@ export class SchoolPackagesService {
     const normalizedSuburb = suburb.trim();
 
     return this.db
-      .select({
+      .selectDistinct({
         id: schema.packages.id,
         name: schema.packages.name,
         durationMinutes: schema.packages.durationMinutes,
