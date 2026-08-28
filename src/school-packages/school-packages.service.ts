@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, ilike } from 'drizzle-orm';
+import { and, eq, ilike, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -215,8 +215,25 @@ export class SchoolPackagesService {
         and(
           eq(schema.packages.schoolId, schoolId),
           eq(schema.packages.status, 'active'),
-          ilike(schema.locationGroupSuburbs.suburb, `%${normalizedSuburb}%`),
+          or(
+            ilike(schema.locationGroupSuburbs.suburb, `%${normalizedSuburb}%`),
+            ilike(schema.locationGroupSuburbs.postcode, `%${normalizedSuburb}%`),
+          ),
         ),
       );
+  }
+
+  async getLowestPublicPriceBySuburb(schoolId: string, suburb: string): Promise<number | null> {
+    const packages = await this.getPublicPackagesBySuburb(schoolId, suburb);
+
+    const prices = packages
+      .map((pkg) => Number(pkg.price))
+      .filter((price) => Number.isFinite(price) && price > 0);
+
+    if (prices.length === 0) {
+      return null;
+    }
+
+    return Math.min(...prices);
   }
 }

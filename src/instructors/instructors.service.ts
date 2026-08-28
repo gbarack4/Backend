@@ -10,10 +10,11 @@ import { and, eq, exists, ilike, or, SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
-import { BookingsService } from '@/bookings/bookings.service';
+import { BookingSlotsService } from '@/bookings/booking-slots.service';
 import { DB_CONNECTION } from '@/database/database.module';
 import { FullSchema } from '@/database/database.types';
 import { instructorOnboardingDrafts } from '@/database/schema';
+import { SchoolPackagesService } from '@/school-packages/school-packages.service';
 import { S3Service } from '@/storage/s3.service';
 
 import { OnboardInstructorDto } from './dto/onboard-instructor.dto';
@@ -30,7 +31,8 @@ export class InstructorsService {
     @Inject(DB_CONNECTION)
     private readonly db: NodePgDatabase<FullSchema>,
     private readonly s3Service: S3Service,
-    private readonly bookingsService: BookingsService,
+    private readonly bookingSlotsService: BookingSlotsService,
+    private readonly schoolPackagesService: SchoolPackagesService,
   ) {}
 
   private buildUserUpdates(dto: UpdatePersonalInfoDto) {
@@ -396,7 +398,7 @@ export class InstructorsService {
       throw new NotFoundException('Instructor not found');
     }
 
-    const availableSlots = await this.bookingsService.getAvailableStartSlotsForInstructor(
+    const availableSlots = await this.bookingSlotsService.getAvailableStartSlotsForInstructor(
       schoolId,
       instructorId,
       suburb,
@@ -479,16 +481,33 @@ export class InstructorsService {
       )
       .where(and(...conditions));
 
-    const slotsByInstructor = await this.bookingsService.getAvailableStartSlotsForInstructors(
-      schoolId,
-      instructors.map((instructor) => instructor.id),
-      normalizedSuburb,
-      preferredDate,
-    );
+    const instructorIds = instructors.map((instructor) => instructor.id);
 
-    return instructors.map((instructor) => ({
-      ...instructor,
-      availableSlots: slotsByInstructor[instructor.id] ?? [],
-    }));
+    const [slotsByInstructor, monthlySlotCounts, lowestEligiblePrice] = await Promise.all([
+      this.bookingSlotsService.getAvailableStartSlotsForInstructors(
+        schoolId,
+        instructorIds,
+        normalizedSuburb,
+        preferredDate,
+      ),
+
+      this.bookingSlotsService.getAvailableStartSlotCountsForMonth(
+        schoolId,
+        instructorIds,
+        normalizedSuburb,
+        preferredDate,
+      ),
+
+      this.schoolPackagesService.getLowestPublicPriceBySuburb(schoolId, normalizedSuburb),
+    ]);
+
+    return instructors
+      .filter((instructor) => (slotsByInstructor[instructor.id]?.length ?? 0) > 0)
+      .map((instructor) => ({
+        ...instructor,
+        availableSlots: slotsByInstructor[instructor.id] ?? [],
+        monthlyAvailableSlotCount: monthlySlotCounts[instructor.id] ?? 0,
+        lowestEligiblePrice,
+      }));
   }
 }
