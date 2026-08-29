@@ -19,6 +19,7 @@ import {
   locationGroupSuburbs,
   locations,
   notifications,
+  packagePurchases,
   packages,
   payments,
   pricingRules,
@@ -26,6 +27,8 @@ import {
   schools,
   schoolUsers,
   services,
+  studentCreditBalances,
+  studentCreditTransactions,
   students,
   users,
 } from './schema';
@@ -67,6 +70,10 @@ export const schoolsRelations = relations(schools, ({ many }) => ({
   activityLogs: many(activityLogs),
   locationGroups: many(locationGroups),
   packages: many(packages),
+  packagePurchases: many(packagePurchases),
+  payments: many(payments),
+  studentCreditBalances: many(studentCreditBalances),
+  studentCreditTransactions: many(studentCreditTransactions),
 }));
 
 export const locationsRelations = relations(locations, ({ one }) => ({
@@ -114,6 +121,10 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
   bookings: many(bookings),
   invoices: many(invoices),
   reviews: many(reviews),
+  packagePurchases: many(packagePurchases),
+  payments: many(payments),
+  creditBalances: many(studentCreditBalances),
+  creditTransactions: many(studentCreditTransactions),
 }));
 
 export const availabilityRelations = relations(availability, ({ one, many }) => ({
@@ -169,7 +180,18 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
 
   invoices: many(invoices),
   reviews: many(reviews),
-  payments: many(payments),
+
+  packagePurchase: one(packagePurchases, {
+    fields: [bookings.packagePurchaseId],
+    references: [packagePurchases.id],
+  }),
+
+  cancelledBy: one(users, {
+    fields: [bookings.cancelledByUserId],
+    references: [users.id],
+  }),
+
+  creditTransactions: many(studentCreditTransactions),
 }));
 
 export const bookingFormsRelations = relations(bookingForms, ({ one, many }) => ({
@@ -259,9 +281,19 @@ export const couponsRelations = relations(coupons, ({ one }) => ({
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
-  booking: one(bookings, {
-    fields: [payments.bookingId],
-    references: [bookings.id],
+  school: one(schools, {
+    fields: [payments.schoolId],
+    references: [schools.id],
+  }),
+
+  student: one(students, {
+    fields: [payments.studentId],
+    references: [students.id],
+  }),
+
+  packagePurchase: one(packagePurchases, {
+    fields: [payments.packagePurchaseId],
+    references: [packagePurchases.id],
   }),
 }));
 
@@ -298,4 +330,63 @@ export const packagesRelations = relations(packages, ({ one, many }) => ({
     references: [locationGroups.id],
   }),
   bookings: many(bookings),
+  purchases: many(packagePurchases),
 }));
+
+export const packagePurchasesRelations = relations(packagePurchases, ({ one, many }) => ({
+  school: one(schools, {
+    fields: [packagePurchases.schoolId],
+    references: [schools.id],
+  }),
+
+  student: one(students, {
+    fields: [packagePurchases.studentId],
+    references: [students.id],
+  }),
+
+  package: one(packages, {
+    fields: [packagePurchases.packageId],
+    references: [packages.id],
+  }),
+
+  bookings: many(bookings),
+  payments: many(payments),
+  creditTransactions: many(studentCreditTransactions),
+}));
+
+export const studentCreditBalancesRelations = relations(studentCreditBalances, ({ one }) => ({
+  school: one(schools, {
+    fields: [studentCreditBalances.schoolId],
+    references: [schools.id],
+  }),
+
+  student: one(students, {
+    fields: [studentCreditBalances.studentId],
+    references: [students.id],
+  }),
+}));
+
+export const studentCreditTransactionsRelations = relations(
+  studentCreditTransactions,
+  ({ one }) => ({
+    school: one(schools, {
+      fields: [studentCreditTransactions.schoolId],
+      references: [schools.id],
+    }),
+
+    student: one(students, {
+      fields: [studentCreditTransactions.studentId],
+      references: [students.id],
+    }),
+
+    packagePurchase: one(packagePurchases, {
+      fields: [studentCreditTransactions.packagePurchaseId],
+      references: [packagePurchases.id],
+    }),
+
+    booking: one(bookings, {
+      fields: [studentCreditTransactions.bookingId],
+      references: [bookings.id],
+    }),
+  }),
+);

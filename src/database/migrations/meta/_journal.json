@@ -232,6 +232,13 @@
       "when": 1787566386516,
       "tag": "0032_update_bookings_to_packages_and_suburbs",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788026338047,
+      "tag": "0033_add_payments_and_credits",
+      "breakpoints": true
     }
   ]
 }

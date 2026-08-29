@@ -146,6 +146,11 @@ export const schools = pgTable(
       mode: 'string',
     }),
 
+    stripeAccountId: text('stripe_account_id'),
+    stripeChargesEnabled: boolean('stripe_charges_enabled').default(false).notNull(),
+    stripePayoutsEnabled: boolean('stripe_payouts_enabled').default(false).notNull(),
+    stripeDetailsSubmitted: boolean('stripe_details_submitted').default(false).notNull(),
+
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -163,6 +168,7 @@ export const schools = pgTable(
     }).onDelete('restrict'),
 
     unique('schools_slug_key').on(table.slug),
+    unique('schools_stripe_account_id_key').on(table.stripeAccountId),
     index('idx_schools_name_trgm').using('gin', table.name.op('gin_trgm_ops')),
     check(
       'schools_status_check',
@@ -525,7 +531,9 @@ export const bookings = pgTable(
     studentId: uuid('student_id'),
     instructorId: uuid('instructor_id').notNull(),
 
-    packageId: uuid('package_id').notNull(),
+    packageId: uuid('package_id'),
+    packagePurchaseId: uuid('package_purchase_id'),
+    bookingSource: text('booking_source').default('package').notNull(),
 
     pickupSuburb: text('pickup_suburb').notNull(),
     pickupPostcode: text('pickup_postcode'),
@@ -553,6 +561,24 @@ export const bookings = pgTable(
       withTimezone: true,
       mode: 'string',
     }).defaultNow(),
+
+    confirmedAt: timestamp('confirmed_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+    completedAt: timestamp('completed_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+    cancelledAt: timestamp('cancelled_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+    cancelledByUserId: uuid('cancelled_by_user_id'),
+    paymentExpiresAt: timestamp('payment_expires_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
   },
   (table) => [
     index('idx_bookings_instructor_id').using(
@@ -586,6 +612,17 @@ export const bookings = pgTable(
       name: 'bookings_package_id_fkey',
     }).onDelete('restrict'),
 
+    foreignKey({
+      columns: [table.packagePurchaseId],
+      foreignColumns: [packagePurchases.id],
+      name: 'bookings_package_purchase_id_fkey',
+    }).onDelete('set null'),
+    foreignKey({
+      columns: [table.cancelledByUserId],
+      foreignColumns: [users.id],
+      name: 'bookings_cancelled_by_user_id_fkey',
+    }).onDelete('set null'),
+
     pgPolicy('isolate_bookings', {
       as: 'permissive',
       for: 'all',
@@ -609,15 +646,25 @@ export const bookings = pgTable(
     check(
       'bookings_status_check',
       sql`status = ANY (
-        ARRAY[
-          'pending'::text,
-          'confirmed'::text,
-          'completed'::text,
-          'cancelled'::text
-        ]
-      )`,
+    ARRAY[
+      'pending'::text,
+      'confirmed'::text,
+      'completed'::text,
+      'cancelled'::text,
+      'expired'::text
+    ]
+  )`,
     ),
 
+    check(
+      'bookings_source_check',
+      sql`booking_source = ANY (
+    ARRAY[
+      'package'::text,
+      'credit'::text
+    ]
+  )`,
+    ),
     check('bookings_check', sql`end_datetime > start_datetime`),
   ],
 );
@@ -864,36 +911,210 @@ export const payments = pgTable(
   'payments',
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
-    bookingId: uuid('booking_id').notNull(),
-    amount: numeric({ precision: 10, scale: 2 }).notNull(),
-    method: text(),
-    status: text().notNull(),
-    transactionRef: text('transaction_ref'),
+
+    schoolId: uuid('school_id').notNull(),
+    studentId: uuid('student_id').notNull(),
+    packagePurchaseId: uuid('package_purchase_id').notNull(),
+
+    amount: numeric({
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+
+    currency: text().default('aud').notNull(),
+
+    status: text().default('pending').notNull(),
+
+    stripeAccountId: text('stripe_account_id').notNull(),
+    stripePaymentIntentId: text('stripe_payment_intent_id').notNull(),
+
+    failureMessage: text('failure_message'),
+
+    paidAt: timestamp('paid_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
     }).defaultNow(),
   },
   (table) => [
+    index('idx_payments_school_id').on(table.schoolId),
+    index('idx_payments_student_id').on(table.studentId),
+
+    unique('payments_stripe_payment_intent_id_key').on(table.stripePaymentIntentId),
+
     foreignKey({
-      columns: [table.bookingId],
-      foreignColumns: [bookings.id],
-      name: 'payments_booking_id_fkey',
-    }).onDelete('cascade'),
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'payments_school_id_fkey',
+    }).onDelete('restrict'),
+
+    foreignKey({
+      columns: [table.studentId],
+      foreignColumns: [students.id],
+      name: 'payments_student_id_fkey',
+    }).onDelete('restrict'),
+
+    foreignKey({
+      columns: [table.packagePurchaseId],
+      foreignColumns: [packagePurchases.id],
+      name: 'payments_package_purchase_id_fkey',
+    }).onDelete('restrict'),
+
+    check(
+      'payments_status_check',
+      sql`status = ANY (
+        ARRAY[
+          'pending'::text,
+          'paid'::text,
+          'failed'::text,
+          'cancelled'::text
+        ]
+      )`,
+    ),
+
     pgPolicy('isolate_payments', {
       as: 'permissive',
       for: 'all',
       to: ['public'],
-      using: sql`(booking_id IN ( SELECT bookings.id
-   FROM bookings
-  WHERE (bookings.school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)))`,
+      using: sql`school_id = (
+        NULLIF(
+          current_setting('app.current_school_id'::text, true),
+          ''
+        )
+      )::uuid`,
     }),
-    check(
-      'payments_status_check',
-      sql`status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text, 'refunded'::text])`,
-    ),
   ],
-);
+).enableRLS();
+
+export const studentCreditBalances = pgTable(
+  'student_credit_balances',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+
+    schoolId: uuid('school_id').notNull(),
+    studentId: uuid('student_id').notNull(),
+
+    balanceMinutes: integer('balance_minutes').default(0).notNull(),
+
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    unique('student_credit_balances_school_student_key').on(table.schoolId, table.studentId),
+
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'student_credit_balances_school_id_fkey',
+    }).onDelete('cascade'),
+
+    foreignKey({
+      columns: [table.studentId],
+      foreignColumns: [students.id],
+      name: 'student_credit_balances_student_id_fkey',
+    }).onDelete('cascade'),
+
+    check('student_credit_balances_non_negative_check', sql`balance_minutes >= 0`),
+
+    pgPolicy('isolate_student_credit_balances', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`school_id = (
+        NULLIF(
+          current_setting('app.current_school_id'::text, true),
+          ''
+        )
+      )::uuid`,
+    }),
+  ],
+).enableRLS();
+
+export const studentCreditTransactions = pgTable(
+  'student_credit_transactions',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+
+    schoolId: uuid('school_id').notNull(),
+    studentId: uuid('student_id').notNull(),
+
+    packagePurchaseId: uuid('package_purchase_id'),
+    bookingId: uuid('booking_id'),
+
+    type: text().notNull(),
+
+    deltaMinutes: integer('delta_minutes').notNull(),
+
+    idempotencyKey: text('idempotency_key').notNull(),
+
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    index('idx_credit_transactions_school_id').on(table.schoolId),
+    index('idx_credit_transactions_student_id').on(table.studentId),
+
+    unique('student_credit_transactions_idempotency_key').on(table.idempotencyKey),
+
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'student_credit_transactions_school_id_fkey',
+    }).onDelete('restrict'),
+
+    foreignKey({
+      columns: [table.studentId],
+      foreignColumns: [students.id],
+      name: 'student_credit_transactions_student_id_fkey',
+    }).onDelete('restrict'),
+
+    foreignKey({
+      columns: [table.packagePurchaseId],
+      foreignColumns: [packagePurchases.id],
+      name: 'student_credit_transactions_purchase_id_fkey',
+    }).onDelete('set null'),
+
+    foreignKey({
+      columns: [table.bookingId],
+      foreignColumns: [bookings.id],
+      name: 'student_credit_transactions_booking_id_fkey',
+    }).onDelete('set null'),
+
+    check(
+      'student_credit_transactions_type_check',
+      sql`type = ANY (
+        ARRAY[
+          'package_credit'::text,
+          'booking_use'::text,
+          'booking_cancelled'::text,
+          'manual_adjustment'::text
+        ]
+      )`,
+    ),
+
+    check('student_credit_transactions_delta_check', sql`delta_minutes <> 0`),
+
+    pgPolicy('isolate_student_credit_transactions', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`school_id = (
+        NULLIF(
+          current_setting('app.current_school_id'::text, true),
+          ''
+        )
+      )::uuid`,
+    }),
+  ],
+).enableRLS();
 
 export const activityLogs = pgTable(
   'activity_logs',
@@ -1099,6 +1320,86 @@ export const packages = pgTable(
       for: 'all',
       to: ['public'],
       using: sql`(school_id = (NULLIF(current_setting('app.current_school_id'::text, true), ''::text))::uuid)`,
+    }),
+  ],
+).enableRLS();
+
+export const packagePurchases = pgTable(
+  'package_purchases',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+
+    schoolId: uuid('school_id').notNull(),
+    studentId: uuid('student_id').notNull(),
+    packageId: uuid('package_id').notNull(),
+
+    purchasedMinutes: integer('purchased_minutes').notNull(),
+
+    totalAmount: numeric('total_amount', {
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+
+    currency: text().default('aud').notNull(),
+
+    status: text().default('pending').notNull(),
+
+    paidAt: timestamp('paid_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
+
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
+  },
+  (table) => [
+    index('idx_package_purchases_school_id').on(table.schoolId),
+    index('idx_package_purchases_student_id').on(table.studentId),
+
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: 'package_purchases_school_id_fkey',
+    }).onDelete('restrict'),
+
+    foreignKey({
+      columns: [table.studentId],
+      foreignColumns: [students.id],
+      name: 'package_purchases_student_id_fkey',
+    }).onDelete('restrict'),
+
+    foreignKey({
+      columns: [table.packageId],
+      foreignColumns: [packages.id],
+      name: 'package_purchases_package_id_fkey',
+    }).onDelete('restrict'),
+
+    check(
+      'package_purchases_status_check',
+      sql`status = ANY (
+        ARRAY[
+          'pending'::text,
+          'paid'::text,
+          'failed'::text,
+          'expired'::text
+        ]
+      )`,
+    ),
+
+    check('package_purchases_minutes_check', sql`purchased_minutes > 0`),
+
+    pgPolicy('isolate_package_purchases', {
+      as: 'permissive',
+      for: 'all',
+      to: ['public'],
+      using: sql`school_id = (
+        NULLIF(
+          current_setting('app.current_school_id'::text, true),
+          ''
+        )
+      )::uuid`,
     }),
   ],
 ).enableRLS();
