@@ -18,9 +18,6 @@ export class CreateBookingDto {
   @IsDateString()
   startDatetime!: string;
 
-  @IsDateString()
-  endDatetime!: string;
-
   @IsOptional()
   @IsString()
   notes?: string;

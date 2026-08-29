@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { and, eq, gt, ilike, lt, ne, or } from 'drizzle-orm';
+import { and, eq, gt, ilike, isNull, lt, ne, notInArray, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -46,7 +46,8 @@ export class BookingsService {
       throw new NotFoundException('School not found');
     }
 
-    const durationMinutes = bookingPackage.durationMinutes;
+    const durationMinutes =
+      bookingPackage.durationMinutes >= 180 ? 60 : bookingPackage.durationMinutes;
 
     const timezone =
       school.timezone.toLowerCase() === 'sydney' ? 'Australia/Sydney' : school.timezone;
@@ -90,6 +91,7 @@ export class BookingsService {
     const startOfSearchDay = startOfDayZoned.toISOString();
     const endOfSearchDay = endOfDayZoned.toISOString();
     const normalizedSuburb = dto.suburb.trim();
+    const now = new Date().toISOString();
 
     return this.db.query.availability.findMany({
       where: and(
@@ -111,7 +113,12 @@ export class BookingsService {
               where: and(
                 lt(schema.bookings.startDatetime, endOfSearchDay),
                 gt(schema.bookings.endDatetime, startOfSearchDay),
-                ne(schema.bookings.status, 'cancelled'),
+                notInArray(schema.bookings.status, ['cancelled', 'expired']),
+                or(
+                  ne(schema.bookings.status, 'pending'),
+                  isNull(schema.bookings.paymentExpiresAt),
+                  gt(schema.bookings.paymentExpiresAt, now),
+                ),
               ),
             },
             availabilityBlocks: {
@@ -247,12 +254,33 @@ export class BookingsService {
       throw new NotFoundException('Student not found');
     }
 
+    const startDatetime = new Date(dto.startDatetime);
+
+    if (Number.isNaN(startDatetime.getTime())) {
+      throw new BadRequestException('Invalid booking start datetime');
+    }
+
+    if (startDatetime.getTime() <= Date.now()) {
+      throw new BadRequestException('Booking must be in the future');
+    }
+
+    const initialBookingMinutes =
+      bookingPackage.durationMinutes >= 180 ? 60 : bookingPackage.durationMinutes;
+
+    const endDatetime = new Date(startDatetime.getTime() + initialBookingMinutes * 60 * 1000);
+    const now = new Date().toISOString();
+
     const overlappingBooking = await this.db.query.bookings.findFirst({
       where: and(
         eq(schema.bookings.instructorId, dto.instructorId),
-        ne(schema.bookings.status, 'cancelled'),
-        lt(schema.bookings.startDatetime, dto.endDatetime),
-        gt(schema.bookings.endDatetime, dto.startDatetime),
+        notInArray(schema.bookings.status, ['cancelled', 'expired']),
+        or(
+          ne(schema.bookings.status, 'pending'),
+          isNull(schema.bookings.paymentExpiresAt),
+          gt(schema.bookings.paymentExpiresAt, now),
+        ),
+        lt(schema.bookings.startDatetime, endDatetime.toISOString()),
+        gt(schema.bookings.endDatetime, startDatetime.toISOString()),
       ),
     });
 
@@ -262,6 +290,8 @@ export class BookingsService {
       );
     }
 
+    const paymentExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
     const [newBooking] = await this.db
       .insert(schema.bookings)
       .values({
@@ -269,13 +299,15 @@ export class BookingsService {
         studentId: student.id,
         instructorId: dto.instructorId,
         packageId: dto.packageId,
+        bookingSource: 'package',
         pickupSuburb: dto.pickupSuburb,
         pickupPostcode: dto.pickupPostcode,
-        startDatetime: dto.startDatetime,
-        endDatetime: dto.endDatetime,
+        startDatetime: startDatetime.toISOString(),
+        endDatetime: endDatetime.toISOString(),
         totalPrice: bookingPackage.price,
         notes: dto.notes,
         status: 'pending',
+        paymentExpiresAt,
       })
       .returning();
 

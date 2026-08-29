@@ -43,6 +43,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "slugify": "^1.6.9",
+    "stripe": "^22.6.0",
     "svix": "^1.94.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.0"
