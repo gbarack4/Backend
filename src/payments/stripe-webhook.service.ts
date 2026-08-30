@@ -12,7 +12,7 @@ import type Stripe from 'stripe';
 import * as schema from '@/database/schema';
 import { CreditsService } from '@/credits/credits.service';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 import { StripeService } from '@/stripe/stripe.service';
 
 import { PaymentRecord } from './types/payment-record.type';
@@ -86,6 +86,13 @@ export class StripeWebhookService {
 
     const paidAt = new Date().toISOString();
 
+    const usedMinutes = Math.round(
+      (new Date(booking.endDatetime).getTime() - new Date(booking.startDatetime).getTime()) /
+        60_000,
+    );
+
+    const creditMinutes = purchase.purchasedMinutes - usedMinutes;
+
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.payments)
@@ -112,27 +119,18 @@ export class StripeWebhookService {
           paymentExpiresAt: null,
         })
         .where(eq(schema.bookings.id, booking.id));
-    });
 
-    const usedMinutes = Math.round(
-      (new Date(booking.endDatetime).getTime() - new Date(booking.startDatetime).getTime()) /
-        60_000,
-    );
-
-    const creditMinutes = purchase.purchasedMinutes - usedMinutes;
-
-    if (creditMinutes <= 0) {
-      return;
-    }
-
-    await this.creditsService.addCredit({
-      schoolId: purchase.schoolId,
-      studentId: purchase.studentId,
-      packagePurchaseId: purchase.id,
-      bookingId: booking.id,
-      minutes: creditMinutes,
-      type: 'package_credit',
-      idempotencyKey: `package-credit:${purchase.id}`,
+      if (creditMinutes > 0) {
+        await this.creditsService.addCreditInTransaction(tx, {
+          schoolId: purchase.schoolId,
+          studentId: purchase.studentId,
+          packagePurchaseId: purchase.id,
+          bookingId: booking.id,
+          minutes: creditMinutes,
+          type: 'package_credit',
+          idempotencyKey: `package-credit:${purchase.id}`,
+        });
+      }
     });
   }
 

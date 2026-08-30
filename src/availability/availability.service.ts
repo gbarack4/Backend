@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 
 import { UpdateBulkAvailabilityDto } from './dto/update-bulk-availability.dto';
 

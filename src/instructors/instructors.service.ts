@@ -12,7 +12,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '@/database/schema';
 import { BookingSlotsService } from '@/bookings/booking-slots.service';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 import { instructorOnboardingDrafts } from '@/database/schema';
 import { SchoolPackagesService } from '@/school-packages/school-packages.service';
 import { S3Service } from '@/storage/s3.service';

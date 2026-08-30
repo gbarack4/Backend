@@ -1,4 +1,4 @@
-import { AddCreditType } from '../types/add-credit-type.type';
+import type { AddCreditType } from '../types/add-credit-type.type';
 
 export interface AddCreditInput {
   schoolId: string;

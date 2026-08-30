@@ -14,7 +14,7 @@ import slugify from 'slugify';
 import * as schema from '@/database/schema';
 import { stripStreetNumber } from '@/common/utils/address.util';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 import { GeocodingService } from '@/location/geocoding.service';
 
 import {

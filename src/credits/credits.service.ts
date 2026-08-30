@@ -4,7 +4,8 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
+import type { DatabaseTransaction } from '@/database/types/database-transaction.type';
 
 import { AddCreditInput } from './interface/add-credit-input.interface';
 import { UseCreditInput } from './interface/use-credit-input.interface';
@@ -28,58 +29,60 @@ export class CreditsService {
   }
 
   async addCredit(input: AddCreditInput): Promise<number> {
+    return this.db.transaction((tx) => this.addCreditInTransaction(tx, input));
+  }
+
+  async addCreditInTransaction(tx: DatabaseTransaction, input: AddCreditInput): Promise<number> {
     this.validateMinutes(input.minutes);
 
-    return this.db.transaction(async (tx) => {
-      const [transaction] = await tx
-        .insert(schema.studentCreditTransactions)
-        .values({
-          schoolId: input.schoolId,
-          studentId: input.studentId,
-          packagePurchaseId: input.packagePurchaseId ?? null,
-          bookingId: input.bookingId ?? null,
-          type: input.type,
-          deltaMinutes: input.minutes,
-          idempotencyKey: input.idempotencyKey,
-        })
-        .onConflictDoNothing({
-          target: schema.studentCreditTransactions.idempotencyKey,
-        })
-        .returning({
-          id: schema.studentCreditTransactions.id,
-        });
+    const [transaction] = await tx
+      .insert(schema.studentCreditTransactions)
+      .values({
+        schoolId: input.schoolId,
+        studentId: input.studentId,
+        packagePurchaseId: input.packagePurchaseId ?? null,
+        bookingId: input.bookingId ?? null,
+        type: input.type,
+        deltaMinutes: input.minutes,
+        idempotencyKey: input.idempotencyKey,
+      })
+      .onConflictDoNothing({
+        target: schema.studentCreditTransactions.idempotencyKey,
+      })
+      .returning({
+        id: schema.studentCreditTransactions.id,
+      });
 
-      if (!transaction) {
-        const balance = await tx.query.studentCreditBalances.findFirst({
-          where: and(
-            eq(schema.studentCreditBalances.schoolId, input.schoolId),
-            eq(schema.studentCreditBalances.studentId, input.studentId),
-          ),
-        });
+    if (!transaction) {
+      const balance = await tx.query.studentCreditBalances.findFirst({
+        where: and(
+          eq(schema.studentCreditBalances.schoolId, input.schoolId),
+          eq(schema.studentCreditBalances.studentId, input.studentId),
+        ),
+      });
 
-        return balance?.balanceMinutes ?? 0;
-      }
+      return balance?.balanceMinutes ?? 0;
+    }
 
-      const [balance] = await tx
-        .insert(schema.studentCreditBalances)
-        .values({
-          schoolId: input.schoolId,
-          studentId: input.studentId,
-          balanceMinutes: input.minutes,
-        })
-        .onConflictDoUpdate({
-          target: [schema.studentCreditBalances.schoolId, schema.studentCreditBalances.studentId],
-          set: {
-            balanceMinutes: sql`${schema.studentCreditBalances.balanceMinutes} + ${input.minutes}`,
-            updatedAt: new Date().toISOString(),
-          },
-        })
-        .returning({
-          balanceMinutes: schema.studentCreditBalances.balanceMinutes,
-        });
+    const [balance] = await tx
+      .insert(schema.studentCreditBalances)
+      .values({
+        schoolId: input.schoolId,
+        studentId: input.studentId,
+        balanceMinutes: input.minutes,
+      })
+      .onConflictDoUpdate({
+        target: [schema.studentCreditBalances.schoolId, schema.studentCreditBalances.studentId],
+        set: {
+          balanceMinutes: sql`${schema.studentCreditBalances.balanceMinutes} + ${input.minutes}`,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+      .returning({
+        balanceMinutes: schema.studentCreditBalances.balanceMinutes,
+      });
 
-      return balance.balanceMinutes;
-    });
+    return balance.balanceMinutes;
   }
 
   async useCredit(input: UseCreditInput): Promise<number> {

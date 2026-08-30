@@ -2,7 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { eq } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import helmet from 'helmet';
 
 import * as schema from '@/database/schema';
@@ -10,7 +10,7 @@ import { DB_CONNECTION } from '@/database/database.module';
 
 import { AppModule } from './app.module';
 import { TrimPipe } from './common/pipes/trim.pipe';
-import { FullSchema } from './database/database.types';
+import type { FullSchema } from './database/database.types';
 
 const logger = new Logger('Bootstrap');
 

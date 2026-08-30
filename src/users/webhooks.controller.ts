@@ -16,7 +16,7 @@ import type { Request, Response } from 'express';
 import { Webhook } from 'svix';
 
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 import { StudentsService } from '@/students/students.service';
 
 import { UsersService } from './users.service';

@@ -12,7 +12,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 
 import { REQUIRE_PERMISSION_KEY } from '../decorators/require-permission.decorator';
 import { ROLES_KEY } from '../decorators/roles.decorator';

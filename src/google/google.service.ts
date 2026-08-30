@@ -15,7 +15,7 @@ import { inspect } from 'node:util';
 
 import * as schema from '@/database/schema';
 import { DB_CONNECTION } from '@/database/database.module';
-import { FullSchema } from '@/database/database.types';
+import type { FullSchema } from '@/database/database.types';
 
 import { GOOGLE_ENDPOINTS } from './constants/google.endpoints';
 import {

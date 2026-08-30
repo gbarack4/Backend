@@ -18,7 +18,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { InstructorDocuments } from '@/instructors/types/instructor-documents.type';
+import type { InstructorDocuments } from '@/instructors/types/instructor-documents.type';
 
 export const instructorSchools = pgTable(
   'instructor_schools',
