@@ -17,6 +17,7 @@ import { StripeService } from '@/stripe/stripe.service';
 import { CreatePackagePaymentDto } from './dto/create-package-payment.dto';
 import { CreatePackagePaymentResult } from './interfaces/create-package-payment-result.interface';
 import { CreateStripePaymentIntentInput } from './interfaces/create-stripe-payment-intent-input.interface';
+import { PackagePaymentStatus } from './interfaces/package-payment-status.interface';
 
 @Injectable()
 export class PaymentsService {
@@ -366,5 +367,37 @@ export class PaymentsService {
     }
 
     return minorUnits;
+  }
+
+  async getPackagePaymentStatus(
+    userId: string,
+    schoolId: string,
+    bookingId: string,
+  ): Promise<PackagePaymentStatus> {
+    const student = await this.getStudent(userId, schoolId);
+
+    const booking = await this.getBooking(bookingId, schoolId, student.id);
+
+    if (!booking.packagePurchaseId) {
+      return {
+        bookingId: booking.id,
+        bookingStatus: booking.status,
+        paymentStatus: null,
+      };
+    }
+
+    const payment = await this.db.query.payments.findFirst({
+      where: and(
+        eq(schema.payments.packagePurchaseId, booking.packagePurchaseId),
+        eq(schema.payments.schoolId, schoolId),
+        eq(schema.payments.studentId, student.id),
+      ),
+    });
+
+    return {
+      bookingId: booking.id,
+      bookingStatus: booking.status,
+      paymentStatus: payment?.status ?? null,
+    };
   }
 }

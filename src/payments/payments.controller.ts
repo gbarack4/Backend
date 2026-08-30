@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '@/auth/decorators/current-user.decorator';
@@ -35,5 +35,17 @@ export class PaymentsController {
     @Body() dto: CreatePackagePaymentDto,
   ) {
     return this.paymentsService.createPackagePayment(user.id, schoolId, dto);
+  }
+
+  @Get('school/:schoolId/package/:bookingId/status')
+  @Roles(Role.Student)
+  async getPackagePaymentStatus(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' }))
+    bookingId: string,
+  ) {
+    return this.paymentsService.getPackagePaymentStatus(user.id, schoolId, bookingId);
   }
 }

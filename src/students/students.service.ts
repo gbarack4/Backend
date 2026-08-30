@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
+import { ClerkAuthService } from '@/auth/clerk-auth.service';
 import { DB_CONNECTION } from '@/database/database.module';
 import type { FullSchema } from '@/database/database.types';
 
@@ -11,17 +12,58 @@ export class StudentsService {
   constructor(
     @Inject(DB_CONNECTION)
     private readonly db: NodePgDatabase<FullSchema>,
+    private readonly clerkAuthService: ClerkAuthService,
   ) {}
 
   async syncStudentWithSchool(clerkUserId: string, schoolId: string) {
-    const [user] = await this.db
+    let [user] = await this.db
       .select()
       .from(schema.users)
       .where(eq(schema.users.clerkUserId, clerkUserId))
       .limit(1);
 
     if (!user) {
-      throw new NotFoundException('User not found. Webhook might be delayed.');
+      const clerkUser = await this.clerkAuthService.getUser(clerkUserId);
+
+      const primaryEmail =
+        clerkUser.emailAddresses.find((email) => email.id === clerkUser.primaryEmailAddressId)
+          ?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress;
+
+      if (!primaryEmail) {
+        throw new NotFoundException('Clerk user email not found');
+      }
+
+      const unsafeMetadata = clerkUser.unsafeMetadata as {
+        phone_number?: string;
+      };
+
+      const phoneNumber =
+        typeof unsafeMetadata.phone_number === 'string' ? unsafeMetadata.phone_number : undefined;
+
+      [user] = await this.db
+        .insert(schema.users)
+        .values({
+          clerkUserId,
+          email: primaryEmail,
+          firstName: clerkUser.firstName ?? undefined,
+          lastName: clerkUser.lastName ?? undefined,
+          avatarUrl: clerkUser.imageUrl ?? undefined,
+          phoneNumber,
+        })
+        .onConflictDoUpdate({
+          target: schema.users.clerkUserId,
+          set: {
+            email: primaryEmail,
+            firstName: clerkUser.firstName ?? undefined,
+            lastName: clerkUser.lastName ?? undefined,
+            phoneNumber,
+          },
+        })
+        .returning();
+    }
+
+    if (!user) {
+      throw new NotFoundException('Failed to create user');
     }
 
     const fullName =

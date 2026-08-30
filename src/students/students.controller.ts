@@ -6,6 +6,8 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -13,7 +15,7 @@ import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import { ClerkAuthGuard } from '@/auth/guards/clerk-auth.guard';
 import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
-import type { UserEntity } from '@/auth/interfaces/auth.interface';
+import type { RequestWithAuth, UserEntity } from '@/auth/interfaces/auth.interface';
 
 import { SyncStudentDto } from './dto/sync-student.dto';
 import { UpdateStudentAvatarDto } from './dto/update-student-avatar.dto';
@@ -24,10 +26,16 @@ import { StudentsService } from './students.service';
 export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}
 
-  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @UseGuards(ClerkAuthGuard)
   @Post('sync')
-  async syncStudent(@CurrentUser() user: UserEntity, @Body() dto: SyncStudentDto) {
-    return this.studentsService.syncStudentWithSchool(user.clerkId, dto.schoolId);
+  async syncStudent(@Req() request: RequestWithAuth, @Body() dto: SyncStudentDto) {
+    const clerkUserId = request.authPayload?.clerkId;
+
+    if (!clerkUserId) {
+      throw new UnauthorizedException('Authentication payload is missing');
+    }
+
+    return this.studentsService.syncStudentWithSchool(clerkUserId, dto.schoolId);
   }
 
   @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
