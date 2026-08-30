@@ -32,9 +32,34 @@ export class StripeConnectService {
     let stripeAccountId = school.stripeAccountId;
 
     if (!stripeAccountId) {
-      const account = await stripe.accounts.create({
-        type: 'standard',
-        email: school.email ?? undefined,
+      const account = await stripe.v2.core.accounts.create({
+        contact_email: school.email ?? undefined,
+        display_name: school.name,
+
+        identity: {
+          country: 'AU',
+        },
+
+        dashboard: 'full',
+
+        configuration: {
+          merchant: {
+            capabilities: {
+              card_payments: {
+                requested: true,
+              },
+            },
+          },
+        },
+
+        defaults: {
+          currency: 'aud',
+          responsibilities: {
+            fees_collector: 'stripe',
+            losses_collector: 'stripe',
+          },
+        },
+
         metadata: {
           schoolId,
         },
@@ -58,11 +83,19 @@ export class StripeConnectService {
       throw new Error('Stripe Connect URLs are missing');
     }
 
-    const accountLink = await stripe.accountLinks.create({
+    const accountLink = await stripe.v2.core.accountLinks.create({
       account: stripeAccountId,
-      refresh_url: refreshUrl,
-      return_url: returnUrl,
-      type: 'account_onboarding',
+      use_case: {
+        type: 'account_onboarding',
+        account_onboarding: {
+          configurations: ['merchant'],
+          refresh_url: refreshUrl,
+          return_url: returnUrl,
+          collection_options: {
+            fields: 'eventually_due',
+          },
+        },
+      },
     });
 
     return {
