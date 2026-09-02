@@ -1,0 +1,1 @@
+ALTER TABLE "availability_locations" ADD COLUMN "coordinates" geometry(point);

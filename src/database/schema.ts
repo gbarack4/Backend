@@ -451,8 +451,15 @@ export const availabilityLocations = pgTable(
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
     availabilityId: uuid('availability_id').notNull(),
+
     suburb: text('suburb').notNull(),
     postcode: text('postcode'),
+
+    coordinates: geometry('coordinates', {
+      type: 'point',
+      mode: 'xy',
+      srid: 4326,
+    }),
   },
   (table) => [
     foreignKey({

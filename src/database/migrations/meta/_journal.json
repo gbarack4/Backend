@@ -246,6 +246,13 @@
       "when": 1788343914039,
       "tag": "0034_add_student_address_and_booking_pickup",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788359040809,
+      "tag": "0035_availability-location-coordinates",
+      "breakpoints": true
     }
   ]
 }
