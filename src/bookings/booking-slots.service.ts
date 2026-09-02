@@ -55,15 +55,30 @@ export class BookingSlotsService {
       ),
       with: {
         locations: {
+          columns: {
+            id: true,
+          },
           where: or(
             ilike(schema.availabilityLocations.suburb, `%${normalizedSuburb}%`),
             ilike(schema.availabilityLocations.postcode, `%${normalizedSuburb}%`),
           ),
         },
-        breaks: true,
+        breaks: {
+          columns: {
+            startTime: true,
+            endTime: true,
+          },
+        },
         instructor: {
+          columns: {
+            id: true,
+          },
           with: {
             bookings: {
+              columns: {
+                startDatetime: true,
+                endDatetime: true,
+              },
               where: and(
                 lt(schema.bookings.startDatetime, endOfSearchDay),
                 gt(schema.bookings.endDatetime, startOfSearchDay),
@@ -71,6 +86,10 @@ export class BookingSlotsService {
               ),
             },
             availabilityBlocks: {
+              columns: {
+                startDatetime: true,
+                endDatetime: true,
+              },
               where: and(
                 lt(schema.availabilityBlocks.startDatetime, endOfSearchDay),
                 gt(schema.availabilityBlocks.endDatetime, startOfSearchDay),
@@ -196,15 +215,30 @@ export class BookingSlotsService {
       ),
       with: {
         locations: {
+          columns: {
+            id: true,
+          },
           where: or(
             ilike(schema.availabilityLocations.suburb, `%${normalizedSuburb}%`),
             ilike(schema.availabilityLocations.postcode, `%${normalizedSuburb}%`),
           ),
         },
-        breaks: true,
+        breaks: {
+          columns: {
+            startTime: true,
+            endTime: true,
+          },
+        },
         instructor: {
+          columns: {
+            id: true,
+          },
           with: {
             bookings: {
+              columns: {
+                startDatetime: true,
+                endDatetime: true,
+              },
               where: and(
                 lt(schema.bookings.startDatetime, endOfMonth),
                 gt(schema.bookings.endDatetime, startOfMonth),
@@ -212,6 +246,10 @@ export class BookingSlotsService {
               ),
             },
             availabilityBlocks: {
+              columns: {
+                startDatetime: true,
+                endDatetime: true,
+              },
               where: and(
                 lt(schema.availabilityBlocks.startDatetime, endOfMonth),
                 gt(schema.availabilityBlocks.endDatetime, startOfMonth),
