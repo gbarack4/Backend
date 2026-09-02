@@ -187,4 +187,38 @@ export class StudentsService {
 
     return student;
   }
+
+  async updateAddress(
+    userId: string,
+    schoolId: string,
+    data: {
+      address: string;
+      suburb: string;
+      postcode: string | null;
+      latitude: number;
+      longitude: number;
+      googlePlaceId: string | null;
+    },
+  ) {
+    const [student] = await this.db
+      .update(schema.students)
+      .set({
+        address: data.address.trim(),
+        addressSuburb: data.suburb.trim(),
+        addressPostcode: data.postcode?.trim() || null,
+        addressCoordinates: {
+          x: data.longitude,
+          y: data.latitude,
+        },
+        addressGooglePlaceId: data.googlePlaceId?.trim() || null,
+      })
+      .where(and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)))
+      .returning();
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    return student;
+  }
 }

@@ -23,6 +23,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateCreditBookingDto } from './dto/create-credit-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
 import { GetCreditAvailableSlotsDto } from './dto/get-credit-available-slots.dto';
+import { SearchSchoolInstructorsDto } from './dto/search-school-instructors.dto';
 
 @Controller('bookings')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
@@ -59,6 +60,17 @@ export class BookingsController {
     return this.bookingInstructorsService.getSchoolInstructors(user.id, schoolId);
   }
 
+  @Get('school/:schoolId/instructors/search')
+  @Roles(Role.Student)
+  async searchSchoolInstructors(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+    @Query() dto: SearchSchoolInstructorsDto,
+  ) {
+    return this.bookingInstructorsService.searchSchoolInstructors(user.id, schoolId, dto.query);
+  }
+
   @Post('school/:schoolId/credit')
   @Roles(Role.Student)
   async createCreditBooking(
@@ -74,7 +86,8 @@ export class BookingsController {
   @Roles(Role.Student)
   async createBooking(
     @CurrentUser() user: UserEntity,
-    @Param('schoolId', new ParseUUIDPipe({ version: '4' })) schoolId: string,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
     @Body() dto: CreateBookingDto,
   ) {
     return this.bookingsService.createBooking(user.id, schoolId, dto);

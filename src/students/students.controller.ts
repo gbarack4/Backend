@@ -18,6 +18,7 @@ import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import type { RequestWithAuth, UserEntity } from '@/auth/interfaces/auth.interface';
 
 import { SyncStudentDto } from './dto/sync-student.dto';
+import { UpdateStudentAddressDto } from './dto/update-student-address.dto';
 import { UpdateStudentAvatarDto } from './dto/update-student-avatar.dto';
 import { UpdateStudentPersonalInfoDto } from './dto/update-student-personal-info.dto';
 import { StudentsService } from './students.service';
@@ -89,5 +90,27 @@ export class StudentsController {
     @Body() dto: UpdateStudentPersonalInfoDto,
   ) {
     return this.studentsService.updatePersonalInfo(user.id, schoolId, dto);
+  }
+
+  @UseGuards(ClerkAuthGuard, RequireDbUserGuard)
+  @Patch('school/:schoolId/me/address')
+  @ApiOperation({
+    summary: 'Update current student address for a specific school',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student address updated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Student record not found',
+  })
+  async updateMyAddress(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+    @Body() dto: UpdateStudentAddressDto,
+  ) {
+    return this.studentsService.updateAddress(user.id, schoolId, dto);
   }
 }

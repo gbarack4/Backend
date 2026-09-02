@@ -51,7 +51,9 @@ export class AvailabilityService {
               travelTime: day.travelTime,
             },
           })
-          .returning({ id: schema.availability.id });
+          .returning({
+            id: schema.availability.id,
+          });
 
         const availabilityId = availabilityRecord.id;
         updatedIds.push(availabilityId);
@@ -59,28 +61,40 @@ export class AvailabilityService {
         await tx
           .delete(schema.availabilityLocations)
           .where(eq(schema.availabilityLocations.availabilityId, availabilityId));
+
         await tx
           .delete(schema.availabilityBreaks)
           .where(eq(schema.availabilityBreaks.availabilityId, availabilityId));
 
         if (day.isWorking && day.locations?.length > 0) {
-          await tx
-            .insert(schema.availabilityLocations)
-            .values(day.locations.map((suburb) => ({ availabilityId, suburb })));
+          await tx.insert(schema.availabilityLocations).values(
+            day.locations.map((location) => ({
+              availabilityId,
+              suburb: location.suburb.trim(),
+              postcode: location.postcode?.trim() || null,
+              coordinates: {
+                x: location.longitude,
+                y: location.latitude,
+              },
+            })),
+          );
         }
 
         if (day.isWorking && day.breaks?.length > 0) {
           await tx.insert(schema.availabilityBreaks).values(
-            day.breaks.map((b) => ({
+            day.breaks.map((breakItem) => ({
               availabilityId,
-              startTime: b.startTime,
-              endTime: b.endTime,
+              startTime: breakItem.startTime,
+              endTime: breakItem.endTime,
             })),
           );
         }
       }
 
-      return { success: true, updatedIds };
+      return {
+        success: true,
+        updatedIds,
+      };
     });
   }
 }
