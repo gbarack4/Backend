@@ -1,14 +1,24 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { and, eq, gt, ilike, isNull, lt, ne, notInArray, or } from 'drizzle-orm';
+import { and, eq, gt, ilike, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
+import { CreditsService } from '@/credits/credits.service';
 import { DB_CONNECTION } from '@/database/database.module';
 import type { FullSchema } from '@/database/database.types';
+import { DatabaseTransaction } from '@/database/types/database-transaction.type';
 
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { CreateCreditBookingDto } from './dto/create-credit-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
+import { GetCreditAvailableSlotsDto } from './dto/get-credit-available-slots.dto';
 import { BusyInterval, SlotResult } from './types/bookings.types';
 
 type AvailabilityRecord = Awaited<ReturnType<BookingsService['findAvailabilities']>>[number];
@@ -27,6 +37,7 @@ export class BookingsService {
   constructor(
     @Inject(DB_CONNECTION)
     private readonly db: NodePgDatabase<FullSchema>,
+    private readonly creditsService: CreditsService,
   ) {}
 
   async getAvailableSlots(dto: GetAvailableSlotsDto) {
@@ -83,17 +94,18 @@ export class BookingsService {
   }
 
   private async findAvailabilities(
-    dto: GetAvailableSlotsDto,
+    dto: Pick<GetAvailableSlotsDto, 'instructorId' | 'suburb'>,
     targetDayOfWeek: number,
     startOfDayZoned: Date,
     endOfDayZoned: Date,
+    db: NodePgDatabase<FullSchema> | DatabaseTransaction = this.db,
   ) {
     const startOfSearchDay = startOfDayZoned.toISOString();
     const endOfSearchDay = endOfDayZoned.toISOString();
     const normalizedSuburb = dto.suburb.trim();
     const now = new Date().toISOString();
 
-    return this.db.query.availability.findMany({
+    return db.query.availability.findMany({
       where: and(
         eq(schema.availability.instructorId, dto.instructorId),
         eq(schema.availability.dayOfWeek, targetDayOfWeek),
@@ -238,79 +250,325 @@ export class BookingsService {
   }
 
   async createBooking(userId: string, schoolId: string, dto: CreateBookingDto) {
-    const bookingPackage = await this.db.query.packages.findFirst({
-      where: and(eq(schema.packages.id, dto.packageId), eq(schema.packages.schoolId, schoolId)),
+    return this.db.transaction(async (tx) => {
+      await this.lockBookingOperation(tx, `booking-instructor:${dto.instructorId}`);
+
+      const bookingPackage = await tx.query.packages.findFirst({
+        where: and(eq(schema.packages.id, dto.packageId), eq(schema.packages.schoolId, schoolId)),
+      });
+
+      if (!bookingPackage) {
+        throw new NotFoundException('Package not found');
+      }
+
+      const student = await tx.query.students.findFirst({
+        where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
+      });
+
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      const startDatetime = new Date(dto.startDatetime);
+
+      if (Number.isNaN(startDatetime.getTime())) {
+        throw new BadRequestException('Invalid booking start datetime');
+      }
+
+      if (startDatetime.getTime() <= Date.now()) {
+        throw new BadRequestException('Booking must be in the future');
+      }
+
+      const initialBookingMinutes =
+        bookingPackage.durationMinutes >= 180 ? 60 : bookingPackage.durationMinutes;
+
+      const endDatetime = new Date(startDatetime.getTime() + initialBookingMinutes * 60 * 1000);
+
+      const now = new Date().toISOString();
+
+      const overlappingBooking = await tx.query.bookings.findFirst({
+        where: and(
+          eq(schema.bookings.instructorId, dto.instructorId),
+          notInArray(schema.bookings.status, ['cancelled', 'expired']),
+          or(
+            ne(schema.bookings.status, 'pending'),
+            isNull(schema.bookings.paymentExpiresAt),
+            gt(schema.bookings.paymentExpiresAt, now),
+          ),
+          lt(schema.bookings.startDatetime, endDatetime.toISOString()),
+          gt(schema.bookings.endDatetime, startDatetime.toISOString()),
+        ),
+      });
+
+      if (overlappingBooking) {
+        throw new BadRequestException(
+          'This slot has just been booked by someone else. Please choose another time.',
+        );
+      }
+
+      const paymentExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      const [newBooking] = await tx
+        .insert(schema.bookings)
+        .values({
+          schoolId,
+          studentId: student.id,
+          instructorId: dto.instructorId,
+          packageId: dto.packageId,
+          bookingSource: 'package',
+          pickupSuburb: dto.pickupSuburb,
+          pickupPostcode: dto.pickupPostcode,
+          startDatetime: startDatetime.toISOString(),
+          endDatetime: endDatetime.toISOString(),
+          totalPrice: bookingPackage.price,
+          notes: dto.notes,
+          status: 'pending',
+          paymentExpiresAt,
+        })
+        .returning();
+
+      return newBooking;
     });
+  }
 
-    if (!bookingPackage) {
-      throw new NotFoundException('Package not found');
-    }
+  private async lockBookingOperation(tx: DatabaseTransaction, key: string): Promise<void> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+  }
 
-    const student = await this.db.query.students.findFirst({
+  async getCreditAvailableSlots(
+    userId: string,
+    schoolId: string,
+    dto: GetCreditAvailableSlotsDto,
+    db: NodePgDatabase<FullSchema> | DatabaseTransaction = this.db,
+  ): Promise<SlotResult[]> {
+    const student = await db.query.students.findFirst({
       where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
     });
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException('Student not found for this school');
     }
 
+    const school = await db.query.schools.findFirst({
+      where: eq(schema.schools.id, schoolId),
+    });
+
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const instructorMembership = await db.query.instructorSchools.findFirst({
+      where: and(
+        eq(schema.instructorSchools.instructorId, dto.instructorId),
+        eq(schema.instructorSchools.schoolId, schoolId),
+        eq(schema.instructorSchools.status, 'accepted'),
+      ),
+    });
+
+    if (!instructorMembership) {
+      throw new NotFoundException('Instructor is not available in this school');
+    }
+
+    const timezone =
+      school.timezone.toLowerCase() === 'sydney' ? 'Australia/Sydney' : school.timezone;
+
+    const startOfDayZoned = toDate(`${dto.date}T00:00:00`, {
+      timeZone: timezone,
+    });
+
+    const endOfDayZoned = toDate(`${dto.date}T23:59:59.999`, {
+      timeZone: timezone,
+    });
+
+    if (Number.isNaN(startOfDayZoned.getTime()) || Number.isNaN(endOfDayZoned.getTime())) {
+      throw new BadRequestException(`Invalid date or school timezone: ${timezone}`);
+    }
+
+    const targetDayOfWeek = new Date(`${dto.date}T00:00:00Z`).getUTCDay();
+
+    const rawAvailabilities = await this.findAvailabilities(
+      dto,
+      targetDayOfWeek,
+      startOfDayZoned,
+      endOfDayZoned,
+      db,
+    );
+
+    const validAvailabilities = rawAvailabilities.filter(isValidAvailability);
+
+    return this.calculateSlots(validAvailabilities, dto.durationMinutes, startOfDayZoned, timezone);
+  }
+
+  async createCreditBooking(userId: string, schoolId: string, dto: CreateCreditBookingDto) {
     const startDatetime = new Date(dto.startDatetime);
 
     if (Number.isNaN(startDatetime.getTime())) {
       throw new BadRequestException('Invalid booking start datetime');
     }
 
-    if (startDatetime.getTime() <= Date.now()) {
-      throw new BadRequestException('Booking must be in the future');
-    }
-
-    const initialBookingMinutes =
-      bookingPackage.durationMinutes >= 180 ? 60 : bookingPackage.durationMinutes;
-
-    const endDatetime = new Date(startDatetime.getTime() + initialBookingMinutes * 60 * 1000);
-    const now = new Date().toISOString();
-
-    const overlappingBooking = await this.db.query.bookings.findFirst({
-      where: and(
-        eq(schema.bookings.instructorId, dto.instructorId),
-        notInArray(schema.bookings.status, ['cancelled', 'expired']),
-        or(
-          ne(schema.bookings.status, 'pending'),
-          isNull(schema.bookings.paymentExpiresAt),
-          gt(schema.bookings.paymentExpiresAt, now),
-        ),
-        lt(schema.bookings.startDatetime, endDatetime.toISOString()),
-        gt(schema.bookings.endDatetime, startDatetime.toISOString()),
-      ),
-    });
-
-    if (overlappingBooking) {
+    if (
+      !Number.isInteger(dto.durationMinutes) ||
+      dto.durationMinutes < 60 ||
+      dto.durationMinutes > 180 ||
+      dto.durationMinutes % 15 !== 0
+    ) {
       throw new BadRequestException(
-        'This slot has just been booked by someone else. Please choose another time.',
+        'Lesson duration must be between 60 and 180 minutes in 15-minute increments',
       );
     }
 
-    const paymentExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const endDatetime = new Date(startDatetime.getTime() + dto.durationMinutes * 60 * 1000);
 
-    const [newBooking] = await this.db
-      .insert(schema.bookings)
-      .values({
+    const pickupSuburb = dto.pickupSuburb.trim();
+
+    if (!pickupSuburb) {
+      throw new BadRequestException('Pickup suburb is required');
+    }
+
+    return this.db.transaction(async (tx) => {
+      const student = await tx.query.students.findFirst({
+        where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
+      });
+
+      if (!student) {
+        throw new NotFoundException('Student not found for this school');
+      }
+
+      const idempotencyKey = `credit-booking:${schoolId}:${student.id}:${dto.idempotencyKey}`;
+
+      await this.lockBookingOperation(tx, idempotencyKey);
+
+      const existingTransaction = await tx.query.studentCreditTransactions.findFirst({
+        where: and(
+          eq(schema.studentCreditTransactions.idempotencyKey, idempotencyKey),
+          eq(schema.studentCreditTransactions.schoolId, schoolId),
+          eq(schema.studentCreditTransactions.studentId, student.id),
+          eq(schema.studentCreditTransactions.type, 'booking_use'),
+        ),
+      });
+
+      if (existingTransaction) {
+        if (!existingTransaction.bookingId) {
+          throw new ConflictException(
+            'This request has already been processed, but its booking is unavailable',
+          );
+        }
+
+        const booking = await tx.query.bookings.findFirst({
+          where: and(
+            eq(schema.bookings.id, existingTransaction.bookingId),
+            eq(schema.bookings.schoolId, schoolId),
+            eq(schema.bookings.studentId, student.id),
+          ),
+        });
+
+        if (!booking) {
+          throw new ConflictException('Previously created booking is unavailable');
+        }
+
+        const matchesRequest =
+          booking.bookingSource === 'credit' &&
+          booking.instructorId === dto.instructorId &&
+          new Date(booking.startDatetime).getTime() === startDatetime.getTime() &&
+          new Date(booking.endDatetime).getTime() === endDatetime.getTime() &&
+          existingTransaction.deltaMinutes === -dto.durationMinutes &&
+          booking.pickupSuburb === pickupSuburb &&
+          booking.pickupPostcode === (dto.pickupPostcode ?? null) &&
+          booking.notes === (dto.notes ?? null);
+
+        if (!matchesRequest) {
+          throw new ConflictException(
+            'This idempotency key has already been used for a different booking request',
+          );
+        }
+
+        const balance = await tx.query.studentCreditBalances.findFirst({
+          where: and(
+            eq(schema.studentCreditBalances.schoolId, schoolId),
+            eq(schema.studentCreditBalances.studentId, student.id),
+          ),
+        });
+
+        return {
+          booking,
+          balanceMinutes: balance?.balanceMinutes ?? 0,
+        };
+      }
+
+      await this.lockBookingOperation(tx, `booking-instructor:${dto.instructorId}`);
+
+      if (startDatetime.getTime() <= Date.now()) {
+        throw new BadRequestException('Booking must be in the future');
+      }
+
+      const school = await tx.query.schools.findFirst({
+        where: eq(schema.schools.id, schoolId),
+      });
+
+      if (!school) {
+        throw new NotFoundException('School not found');
+      }
+
+      const timezone =
+        school.timezone.toLowerCase() === 'sydney' ? 'Australia/Sydney' : school.timezone;
+
+      const availableSlots = await this.getCreditAvailableSlots(
+        userId,
+        schoolId,
+        {
+          instructorId: dto.instructorId,
+          suburb: pickupSuburb,
+          date: formatInTimeZone(startDatetime, timezone, 'yyyy-MM-dd'),
+          durationMinutes: dto.durationMinutes,
+        },
+        tx,
+      );
+
+      const selectedSlot = availableSlots.find(
+        (slot) =>
+          new Date(slot.startDatetime).getTime() === startDatetime.getTime() &&
+          new Date(slot.endDatetime).getTime() === endDatetime.getTime(),
+      );
+
+      if (!selectedSlot) {
+        throw new ConflictException(
+          'This time is no longer available. Please choose another slot.',
+        );
+      }
+
+      const [booking] = await tx
+        .insert(schema.bookings)
+        .values({
+          schoolId,
+          studentId: student.id,
+          instructorId: dto.instructorId,
+          bookingSource: 'credit',
+          packageId: null,
+          packagePurchaseId: null,
+          pickupSuburb,
+          pickupPostcode: dto.pickupPostcode ?? null,
+          startDatetime: selectedSlot.startDatetime,
+          endDatetime: selectedSlot.endDatetime,
+          totalPrice: '0.00',
+          notes: dto.notes ?? null,
+          status: 'confirmed',
+          confirmedAt: new Date().toISOString(),
+          paymentExpiresAt: null,
+        })
+        .returning();
+
+      const balanceMinutes = await this.creditsService.useCreditInTransaction(tx, {
         schoolId,
         studentId: student.id,
-        instructorId: dto.instructorId,
-        packageId: dto.packageId,
-        bookingSource: 'package',
-        pickupSuburb: dto.pickupSuburb,
-        pickupPostcode: dto.pickupPostcode,
-        startDatetime: startDatetime.toISOString(),
-        endDatetime: endDatetime.toISOString(),
-        totalPrice: bookingPackage.price,
-        notes: dto.notes,
-        status: 'pending',
-        paymentExpiresAt,
-      })
-      .returning();
+        bookingId: booking.id,
+        minutes: dto.durationMinutes,
+        idempotencyKey,
+      });
 
-    return newBooking;
+      return {
+        booking,
+        balanceMinutes,
+      };
+    });
   }
 }

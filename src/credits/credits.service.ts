@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -86,65 +86,83 @@ export class CreditsService {
   }
 
   async useCredit(input: UseCreditInput): Promise<number> {
+    return this.db.transaction((tx) => this.useCreditInTransaction(tx, input));
+  }
+
+  async useCreditInTransaction(tx: DatabaseTransaction, input: UseCreditInput): Promise<number> {
     this.validateMinutes(input.minutes);
 
-    return this.db.transaction(async (tx) => {
-      const [transaction] = await tx
-        .insert(schema.studentCreditTransactions)
-        .values({
-          schoolId: input.schoolId,
-          studentId: input.studentId,
-          bookingId: input.bookingId,
-          type: 'booking_use',
-          deltaMinutes: -input.minutes,
-          idempotencyKey: input.idempotencyKey,
-        })
-        .onConflictDoNothing({
-          target: schema.studentCreditTransactions.idempotencyKey,
-        })
-        .returning({
-          id: schema.studentCreditTransactions.id,
-        });
+    const [transaction] = await tx
+      .insert(schema.studentCreditTransactions)
+      .values({
+        schoolId: input.schoolId,
+        studentId: input.studentId,
+        bookingId: input.bookingId,
+        type: 'booking_use',
+        deltaMinutes: -input.minutes,
+        idempotencyKey: input.idempotencyKey,
+      })
+      .onConflictDoNothing({
+        target: schema.studentCreditTransactions.idempotencyKey,
+      })
+      .returning({
+        id: schema.studentCreditTransactions.id,
+      });
 
-      if (!transaction) {
-        const balance = await tx.query.studentCreditBalances.findFirst({
-          where: and(
-            eq(schema.studentCreditBalances.schoolId, input.schoolId),
-            eq(schema.studentCreditBalances.studentId, input.studentId),
-          ),
-        });
+    if (!transaction) {
+      const balance = await tx.query.studentCreditBalances.findFirst({
+        where: and(
+          eq(schema.studentCreditBalances.schoolId, input.schoolId),
+          eq(schema.studentCreditBalances.studentId, input.studentId),
+        ),
+      });
 
-        return balance?.balanceMinutes ?? 0;
-      }
+      return balance?.balanceMinutes ?? 0;
+    }
 
-      const [balance] = await tx
-        .update(schema.studentCreditBalances)
-        .set({
-          balanceMinutes: sql`${schema.studentCreditBalances.balanceMinutes} - ${input.minutes}`,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(
-          and(
-            eq(schema.studentCreditBalances.schoolId, input.schoolId),
-            eq(schema.studentCreditBalances.studentId, input.studentId),
-            gte(schema.studentCreditBalances.balanceMinutes, input.minutes),
-          ),
-        )
-        .returning({
-          balanceMinutes: schema.studentCreditBalances.balanceMinutes,
-        });
+    const [balance] = await tx
+      .update(schema.studentCreditBalances)
+      .set({
+        balanceMinutes: sql`${schema.studentCreditBalances.balanceMinutes} - ${input.minutes}`,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(schema.studentCreditBalances.schoolId, input.schoolId),
+          eq(schema.studentCreditBalances.studentId, input.studentId),
+          gte(schema.studentCreditBalances.balanceMinutes, input.minutes),
+        ),
+      )
+      .returning({
+        balanceMinutes: schema.studentCreditBalances.balanceMinutes,
+      });
 
-      if (!balance) {
-        throw new BadRequestException('Insufficient credit balance');
-      }
+    if (!balance) {
+      throw new BadRequestException('Insufficient credit balance');
+    }
 
-      return balance.balanceMinutes;
-    });
+    return balance.balanceMinutes;
   }
 
   private validateMinutes(minutes: number): void {
     if (!Number.isInteger(minutes) || minutes <= 0) {
       throw new BadRequestException('Credit minutes must be a positive integer');
     }
+  }
+
+  async getStudentBalance(userId: string, schoolId: string) {
+    const student = await this.db.query.students.findFirst({
+      where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found for this school');
+    }
+
+    const balanceMinutes = await this.getBalance(schoolId, student.id);
+
+    return {
+      balanceMinutes,
+    };
   }
 }

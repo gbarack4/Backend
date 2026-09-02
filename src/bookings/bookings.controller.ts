@@ -17,19 +17,57 @@ import { RequireDbUserGuard } from '@/auth/guards/require-db-user.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 import type { UserEntity } from '@/auth/interfaces/auth.interface';
 
+import { BookingInstructorsService } from './booking-instructors.service';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { CreateCreditBookingDto } from './dto/create-credit-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
+import { GetCreditAvailableSlotsDto } from './dto/get-credit-available-slots.dto';
 
 @Controller('bookings')
 @UseGuards(ClerkAuthGuard, RequireDbUserGuard, RolesGuard)
 export class BookingsController {
-  constructor(private readonly bookingsService: BookingsService) {}
+  constructor(
+    private readonly bookingsService: BookingsService,
+    private readonly bookingInstructorsService: BookingInstructorsService,
+  ) {}
 
   @Get('slots')
   @Roles(Role.Student)
   async getAvailableSlots(@Query() dto: GetAvailableSlotsDto) {
     return this.bookingsService.getAvailableSlots(dto);
+  }
+
+  @Get('school/:schoolId/credit-slots')
+  @Roles(Role.Student)
+  async getCreditAvailableSlots(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+    @Query() dto: GetCreditAvailableSlotsDto,
+  ) {
+    return this.bookingsService.getCreditAvailableSlots(user.id, schoolId, dto);
+  }
+
+  @Get('school/:schoolId/instructors')
+  @Roles(Role.Student)
+  async getSchoolInstructors(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+  ) {
+    return this.bookingInstructorsService.getSchoolInstructors(user.id, schoolId);
+  }
+
+  @Post('school/:schoolId/credit')
+  @Roles(Role.Student)
+  async createCreditBooking(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+    @Body() dto: CreateCreditBookingDto,
+  ) {
+    return this.bookingsService.createCreditBooking(user.id, schoolId, dto);
   }
 
   @Post('school/:schoolId')
