@@ -100,6 +100,9 @@ export class PaymentsService {
 
   private async getStudent(userId: string, schoolId: string) {
     const student = await this.db.query.students.findFirst({
+      columns: {
+        id: true,
+      },
       where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
     });
 
@@ -112,6 +115,14 @@ export class PaymentsService {
 
   private async getBooking(bookingId: string, schoolId: string, studentId: string) {
     const booking = await this.db.query.bookings.findFirst({
+      columns: {
+        id: true,
+        packageId: true,
+        packagePurchaseId: true,
+        status: true,
+        totalPrice: true,
+        paymentExpiresAt: true,
+      },
       where: and(
         eq(schema.bookings.id, bookingId),
         eq(schema.bookings.schoolId, schoolId),
@@ -199,6 +210,11 @@ export class PaymentsService {
       `);
 
       const lockedBooking = await tx.query.bookings.findFirst({
+        columns: {
+          status: true,
+          paymentExpiresAt: true,
+          packagePurchaseId: true,
+        },
         where: eq(schema.bookings.id, bookingId),
       });
 

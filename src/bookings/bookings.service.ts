@@ -113,15 +113,33 @@ export class BookingsService {
       ),
       with: {
         locations: {
+          columns: {
+            id: true,
+          },
           where: or(
             ilike(schema.availabilityLocations.suburb, `%${normalizedSuburb}%`),
             ilike(schema.availabilityLocations.postcode, `%${normalizedSuburb}%`),
           ),
         },
-        breaks: true,
+        breaks: {
+          columns: {
+            startTime: true,
+            endTime: true,
+          },
+        },
         instructor: {
+          columns: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            pricePerHour: true,
+          },
           with: {
             bookings: {
+              columns: {
+                startDatetime: true,
+                endDatetime: true,
+              },
               where: and(
                 lt(schema.bookings.startDatetime, endOfSearchDay),
                 gt(schema.bookings.endDatetime, startOfSearchDay),
@@ -134,6 +152,10 @@ export class BookingsService {
               ),
             },
             availabilityBlocks: {
+              columns: {
+                startDatetime: true,
+                endDatetime: true,
+              },
               where: and(
                 lt(schema.availabilityBlocks.startDatetime, endOfSearchDay),
                 gt(schema.availabilityBlocks.endDatetime, startOfSearchDay),
@@ -264,6 +286,9 @@ export class BookingsService {
       }
 
       const student = await tx.query.students.findFirst({
+        columns: {
+          id: true,
+        },
         where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
       });
 
@@ -317,6 +342,9 @@ export class BookingsService {
       const now = new Date().toISOString();
 
       const overlappingBooking = await tx.query.bookings.findFirst({
+        columns: {
+          id: true,
+        },
         where: and(
           eq(schema.bookings.instructorId, dto.instructorId),
           notInArray(schema.bookings.status, ['cancelled', 'expired']),
@@ -388,6 +416,9 @@ export class BookingsService {
     db: NodePgDatabase<FullSchema> | DatabaseTransaction = this.db,
   ): Promise<SlotResult[]> {
     const student = await db.query.students.findFirst({
+      columns: {
+        id: true,
+      },
       where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
     });
 
@@ -473,6 +504,9 @@ export class BookingsService {
 
     return this.db.transaction(async (tx) => {
       const student = await tx.query.students.findFirst({
+        columns: {
+          id: true,
+        },
         where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
       });
 
@@ -501,6 +535,9 @@ export class BookingsService {
         }
 
         const booking = await tx.query.bookings.findFirst({
+          columns: {
+            pickupCoordinates: false,
+          },
           where: and(
             eq(schema.bookings.id, existingTransaction.bookingId),
             eq(schema.bookings.schoolId, schoolId),

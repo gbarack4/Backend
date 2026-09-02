@@ -152,6 +152,9 @@ export class CreditsService {
 
   async getStudentBalance(userId: string, schoolId: string) {
     const student = await this.db.query.students.findFirst({
+      columns: {
+        id: true,
+      },
       where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
     });
 

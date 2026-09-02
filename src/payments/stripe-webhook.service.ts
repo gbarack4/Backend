@@ -74,6 +74,11 @@ export class StripeWebhookService {
     }
 
     const booking = await this.db.query.bookings.findFirst({
+      columns: {
+        id: true,
+        startDatetime: true,
+        endDatetime: true,
+      },
       where: and(
         eq(schema.bookings.packagePurchaseId, purchase.id),
         eq(schema.bookings.bookingSource, 'package'),

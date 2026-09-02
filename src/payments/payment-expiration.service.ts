@@ -23,6 +23,9 @@ export class PaymentExpirationService {
     const now = new Date().toISOString();
 
     const expiredBookings = await this.db.query.bookings.findMany({
+      columns: {
+        id: true,
+      },
       where: and(
         eq(schema.bookings.status, 'pending'),
         isNotNull(schema.bookings.paymentExpiresAt),
@@ -44,6 +47,12 @@ export class PaymentExpirationService {
 
   private async expireBooking(bookingId: string): Promise<void> {
     const booking = await this.db.query.bookings.findFirst({
+      columns: {
+        id: true,
+        status: true,
+        paymentExpiresAt: true,
+        packagePurchaseId: true,
+      },
       where: eq(schema.bookings.id, bookingId),
     });
 
