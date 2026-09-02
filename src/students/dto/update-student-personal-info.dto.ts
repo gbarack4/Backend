@@ -13,10 +13,4 @@ export class UpdateStudentPersonalInfoDto {
   @IsString()
   @MaxLength(50)
   phone!: string | null;
-
-  @ApiProperty({ example: '221B Baker Street, London', nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  address!: string | null;
 }

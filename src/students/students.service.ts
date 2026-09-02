@@ -132,7 +132,6 @@ export class StudentsService {
     data: {
       fullName: string;
       phone: string | null;
-      address: string | null;
     },
   ) {
     return this.db.transaction(async (tx) => {
@@ -148,11 +147,6 @@ export class StudentsService {
       if (!student) {
         throw new NotFoundException('Student record not found for this school');
       }
-
-      await tx
-        .update(schema.users)
-        .set({ address: data.address })
-        .where(eq(schema.users.id, userId));
 
       return this.getStudentByUserIdAndSchool(userId, schoolId, tx);
     });
@@ -179,7 +173,7 @@ export class StudentsService {
           email: schema.users.email,
           phoneNumber: schema.users.phoneNumber,
           avatarUrl: schema.users.avatarUrl,
-          address: schema.users.address,
+          address: schema.students.address,
         },
       })
       .from(schema.students)
