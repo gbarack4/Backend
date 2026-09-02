@@ -251,6 +251,8 @@ export class BookingsService {
 
   async createBooking(userId: string, schoolId: string, dto: CreateBookingDto) {
     return this.db.transaction(async (tx) => {
+      await this.lockBookingOperation(tx, `booking-student:${schoolId}:${userId}`);
+
       await this.lockBookingOperation(tx, `booking-instructor:${dto.instructorId}`);
 
       const bookingPackage = await tx.query.packages.findFirst({
@@ -268,6 +270,34 @@ export class BookingsService {
       if (!student) {
         throw new NotFoundException('Student not found');
       }
+
+      const existingBooking = await tx.query.bookings.findFirst({
+        columns: {
+          id: true,
+        },
+        where: and(
+          eq(schema.bookings.studentId, student.id),
+          eq(schema.bookings.schoolId, schoolId),
+        ),
+      });
+
+      const isFirstBooking = !existingBooking;
+
+      const pickupAddress = dto.pickupAddress.trim();
+      const pickupSuburb = dto.pickupSuburb.trim();
+      const pickupPostcode = dto.pickupPostcode?.trim() || null;
+      const pickupGooglePlaceId = dto.pickupGooglePlaceId?.trim() || null;
+
+      if (!pickupAddress || !pickupSuburb) {
+        throw new BadRequestException('Pickup address and suburb are required');
+      }
+
+      const pickupCoordinates = sql`
+      ST_SetSRID(
+        ST_MakePoint(${dto.pickupLongitude}, ${dto.pickupLatitude}),
+        4326
+      )
+    `;
 
       const startDatetime = new Date(dto.startDatetime);
 
@@ -316,8 +346,11 @@ export class BookingsService {
           instructorId: dto.instructorId,
           packageId: dto.packageId,
           bookingSource: 'package',
-          pickupSuburb: dto.pickupSuburb,
-          pickupPostcode: dto.pickupPostcode,
+          pickupAddress,
+          pickupSuburb,
+          pickupPostcode,
+          pickupCoordinates,
+          pickupGooglePlaceId,
           startDatetime: startDatetime.toISOString(),
           endDatetime: endDatetime.toISOString(),
           totalPrice: bookingPackage.price,
@@ -326,6 +359,19 @@ export class BookingsService {
           paymentExpiresAt,
         })
         .returning();
+
+      if (isFirstBooking) {
+        await tx
+          .update(schema.students)
+          .set({
+            address: pickupAddress,
+            addressSuburb: pickupSuburb,
+            addressPostcode: pickupPostcode,
+            addressCoordinates: pickupCoordinates,
+            addressGooglePlaceId: pickupGooglePlaceId,
+          })
+          .where(and(eq(schema.students.id, student.id), eq(schema.students.schoolId, schoolId)));
+      }
 
       return newBooking;
     });
