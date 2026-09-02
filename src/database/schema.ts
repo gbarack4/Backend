@@ -282,6 +282,15 @@ export const students = pgTable(
     email: text(),
     phone: text(),
     avatarUrl: text('avatar_url'),
+    address: text('address'),
+    addressSuburb: text('address_suburb'),
+    addressPostcode: text('address_postcode'),
+    addressCoordinates: geometry('address_coordinates', {
+      type: 'point',
+      mode: 'xy',
+      srid: 4326,
+    }),
+    addressGooglePlaceId: text('address_google_place_id'),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
@@ -535,8 +544,15 @@ export const bookings = pgTable(
     packagePurchaseId: uuid('package_purchase_id'),
     bookingSource: text('booking_source').default('package').notNull(),
 
+    pickupAddress: text('pickup_address'),
     pickupSuburb: text('pickup_suburb').notNull(),
     pickupPostcode: text('pickup_postcode'),
+    pickupCoordinates: geometry('pickup_coordinates', {
+      type: 'point',
+      mode: 'xy',
+      srid: 4326,
+    }),
+    pickupGooglePlaceId: text('pickup_google_place_id'),
 
     startDatetime: timestamp('start_datetime', {
       withTimezone: true,
