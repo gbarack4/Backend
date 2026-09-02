@@ -19,7 +19,12 @@ export class AvailabilityService {
     return await this.db.query.availability.findMany({
       where: eq(schema.availability.instructorId, instructorId),
       with: {
-        locations: true,
+        locations: {
+          columns: {
+            suburb: true,
+            postcode: true,
+          },
+        },
         breaks: true,
       },
     });
