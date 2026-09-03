@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -168,6 +168,9 @@ export class StudentsService {
         createdAt: schema.students.createdAt,
         addressSuburb: schema.students.addressSuburb,
         addressPostcode: schema.students.addressPostcode,
+        addressLatitude: sql<number | null>`ST_Y(${schema.students.addressCoordinates})`,
+        addressLongitude: sql<number | null>`ST_X(${schema.students.addressCoordinates})`,
+        addressGooglePlaceId: schema.students.addressGooglePlaceId,
         user: {
           id: schema.users.id,
           firstName: schema.users.firstName,
