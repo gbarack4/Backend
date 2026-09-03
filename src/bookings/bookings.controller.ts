@@ -19,9 +19,11 @@ import type { UserEntity } from '@/auth/interfaces/auth.interface';
 
 import { BookingInstructorsService } from './booking-instructors.service';
 import { BookingsService } from './bookings.service';
+import { CreditBookingAvailabilityService } from './credit-booking-availability.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateCreditBookingDto } from './dto/create-credit-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
+import { GetCreditAvailabilityDto } from './dto/get-credit-availability.dto';
 import { GetCreditAvailableSlotsDto } from './dto/get-credit-available-slots.dto';
 import { SearchSchoolInstructorsDto } from './dto/search-school-instructors.dto';
 
@@ -31,12 +33,24 @@ export class BookingsController {
   constructor(
     private readonly bookingsService: BookingsService,
     private readonly bookingInstructorsService: BookingInstructorsService,
+    private readonly creditBookingAvailabilityService: CreditBookingAvailabilityService,
   ) {}
 
   @Get('slots')
   @Roles(Role.Student)
   async getAvailableSlots(@Query() dto: GetAvailableSlotsDto) {
     return this.bookingsService.getAvailableSlots(dto);
+  }
+
+  @Get('school/:schoolId/credit-availability')
+  @Roles(Role.Student)
+  async getCreditAvailability(
+    @CurrentUser() user: UserEntity,
+    @Param('schoolId', new ParseUUIDPipe({ version: '4' }))
+    schoolId: string,
+    @Query() dto: GetCreditAvailabilityDto,
+  ) {
+    return this.creditBookingAvailabilityService.getAvailability(user.id, schoolId, dto);
   }
 
   @Get('school/:schoolId/credit-slots')

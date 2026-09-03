@@ -166,6 +166,8 @@ export class StudentsService {
         phone: schema.students.phone,
         avatarUrl: schema.students.avatarUrl,
         createdAt: schema.students.createdAt,
+        addressSuburb: schema.students.addressSuburb,
+        addressPostcode: schema.students.addressPostcode,
         user: {
           id: schema.users.id,
           firstName: schema.users.firstName,
