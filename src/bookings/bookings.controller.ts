@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import { CurrentInstructorId } from '@/auth/decorators/current-instructor.decorator';
 import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
@@ -26,6 +27,7 @@ import { CreateCreditBookingDto } from './dto/create-credit-booking.dto';
 import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
 import { GetCreditAvailabilityDto } from './dto/get-credit-availability.dto';
 import { GetCreditAvailableSlotsDto } from './dto/get-credit-available-slots.dto';
+import { GetInstructorBookingsDto } from './dto/get-instructor-bookings.dto';
 import { GetStudentBookingsDto } from './dto/get-student-bookings.dto';
 import { SearchSchoolInstructorsDto } from './dto/search-school-instructors.dto';
 
@@ -54,6 +56,15 @@ export class BookingsController {
     @Query() dto: GetStudentBookingsDto,
   ) {
     return this.bookingQueryService.getStudentBookings(user.id, schoolId, dto);
+  }
+
+  @Get('instructor')
+  @Roles(Role.Instructor)
+  async getInstructorBookings(
+    @CurrentInstructorId() instructorId: string,
+    @Query() dto: GetInstructorBookingsDto,
+  ) {
+    return this.bookingQueryService.getInstructorBookings(instructorId, dto);
   }
 
   @Get('school/:schoolId/credit-availability')
