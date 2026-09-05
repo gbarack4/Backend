@@ -6,7 +6,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { and, eq, gt, ilike, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  ilike,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from '@/database/schema';
@@ -409,6 +422,76 @@ export class BookingsService {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
   }
 
+  private async getExistingCreditBookingResult(
+    tx: DatabaseTransaction,
+    schoolId: string,
+    studentId: string,
+    dto: CreateCreditBookingDto,
+    startDatetime: Date,
+    endDatetime: Date,
+    idempotencyKey: string,
+  ) {
+    const existingTransaction = await tx.query.studentCreditTransactions.findFirst({
+      where: and(
+        eq(schema.studentCreditTransactions.idempotencyKey, idempotencyKey),
+        eq(schema.studentCreditTransactions.schoolId, schoolId),
+        eq(schema.studentCreditTransactions.studentId, studentId),
+        eq(schema.studentCreditTransactions.type, 'booking_use'),
+      ),
+    });
+
+    if (!existingTransaction) {
+      return null;
+    }
+
+    if (!existingTransaction.bookingId) {
+      throw new ConflictException(
+        'This request has already been processed, but its booking is unavailable',
+      );
+    }
+
+    const booking = await tx.query.bookings.findFirst({
+      where: and(
+        eq(schema.bookings.id, existingTransaction.bookingId),
+        eq(schema.bookings.schoolId, schoolId),
+        eq(schema.bookings.studentId, studentId),
+      ),
+    });
+
+    if (!booking) {
+      throw new ConflictException('Previously created booking is unavailable');
+    }
+
+    const matchesRequest =
+      booking.bookingSource === 'credit' &&
+      booking.instructorId === dto.instructorId &&
+      new Date(booking.startDatetime).getTime() === startDatetime.getTime() &&
+      new Date(booking.endDatetime).getTime() === endDatetime.getTime() &&
+      existingTransaction.deltaMinutes === -dto.durationMinutes &&
+      booking.notes === (dto.notes ?? null);
+
+    if (!matchesRequest) {
+      throw new ConflictException(
+        'This idempotency key has already been used for a different booking request',
+      );
+    }
+
+    const balance = await tx.query.studentCreditBalances.findFirst({
+      columns: {
+        balanceMinutes: true,
+      },
+      where: and(
+        eq(schema.studentCreditBalances.schoolId, schoolId),
+        eq(schema.studentCreditBalances.studentId, studentId),
+      ),
+    });
+
+    return {
+      booking,
+      balanceMinutes: balance?.balanceMinutes ?? 0,
+    };
+  }
+
   async getCreditAvailableSlots(
     userId: string,
     schoolId: string,
@@ -418,12 +501,19 @@ export class BookingsService {
     const student = await db.query.students.findFirst({
       columns: {
         id: true,
+        addressSuburb: true,
       },
       where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
     });
 
     if (!student) {
       throw new NotFoundException('Student not found for this school');
+    }
+
+    const pickupSuburb = student.addressSuburb?.trim();
+
+    if (!pickupSuburb) {
+      throw new BadRequestException('Student does not have a saved pickup suburb');
     }
 
     const school = await db.query.schools.findFirst({
@@ -464,7 +554,10 @@ export class BookingsService {
     const targetDayOfWeek = new Date(`${dto.date}T00:00:00Z`).getUTCDay();
 
     const rawAvailabilities = await this.findAvailabilities(
-      dto,
+      {
+        instructorId: dto.instructorId,
+        suburb: pickupSuburb,
+      },
       targetDayOfWeek,
       startOfDayZoned,
       endOfDayZoned,
@@ -496,16 +589,15 @@ export class BookingsService {
 
     const endDatetime = new Date(startDatetime.getTime() + dto.durationMinutes * 60 * 1000);
 
-    const pickupSuburb = dto.pickupSuburb.trim();
-
-    if (!pickupSuburb) {
-      throw new BadRequestException('Pickup suburb is required');
-    }
-
     return this.db.transaction(async (tx) => {
       const student = await tx.query.students.findFirst({
         columns: {
           id: true,
+          address: true,
+          addressSuburb: true,
+          addressPostcode: true,
+          addressCoordinates: true,
+          addressGooglePlaceId: true,
         },
         where: and(eq(schema.students.userId, userId), eq(schema.students.schoolId, schoolId)),
       });
@@ -514,68 +606,32 @@ export class BookingsService {
         throw new NotFoundException('Student not found for this school');
       }
 
+      const pickupAddress = student.address?.trim();
+      const pickupSuburb = student.addressSuburb?.trim();
+      const pickupPostcode = student.addressPostcode?.trim() || null;
+      const pickupCoordinates = student.addressCoordinates;
+      const pickupGooglePlaceId = student.addressGooglePlaceId?.trim() || null;
+
+      if (!pickupAddress || !pickupSuburb || !pickupCoordinates) {
+        throw new BadRequestException('Student does not have a complete saved pickup address');
+      }
+
       const idempotencyKey = `credit-booking:${schoolId}:${student.id}:${dto.idempotencyKey}`;
 
       await this.lockBookingOperation(tx, idempotencyKey);
 
-      const existingTransaction = await tx.query.studentCreditTransactions.findFirst({
-        where: and(
-          eq(schema.studentCreditTransactions.idempotencyKey, idempotencyKey),
-          eq(schema.studentCreditTransactions.schoolId, schoolId),
-          eq(schema.studentCreditTransactions.studentId, student.id),
-          eq(schema.studentCreditTransactions.type, 'booking_use'),
-        ),
-      });
+      const existingResult = await this.getExistingCreditBookingResult(
+        tx,
+        schoolId,
+        student.id,
+        dto,
+        startDatetime,
+        endDatetime,
+        idempotencyKey,
+      );
 
-      if (existingTransaction) {
-        if (!existingTransaction.bookingId) {
-          throw new ConflictException(
-            'This request has already been processed, but its booking is unavailable',
-          );
-        }
-
-        const booking = await tx.query.bookings.findFirst({
-          columns: {
-            pickupCoordinates: false,
-          },
-          where: and(
-            eq(schema.bookings.id, existingTransaction.bookingId),
-            eq(schema.bookings.schoolId, schoolId),
-            eq(schema.bookings.studentId, student.id),
-          ),
-        });
-
-        if (!booking) {
-          throw new ConflictException('Previously created booking is unavailable');
-        }
-
-        const matchesRequest =
-          booking.bookingSource === 'credit' &&
-          booking.instructorId === dto.instructorId &&
-          new Date(booking.startDatetime).getTime() === startDatetime.getTime() &&
-          new Date(booking.endDatetime).getTime() === endDatetime.getTime() &&
-          existingTransaction.deltaMinutes === -dto.durationMinutes &&
-          booking.pickupSuburb === pickupSuburb &&
-          booking.pickupPostcode === (dto.pickupPostcode ?? null) &&
-          booking.notes === (dto.notes ?? null);
-
-        if (!matchesRequest) {
-          throw new ConflictException(
-            'This idempotency key has already been used for a different booking request',
-          );
-        }
-
-        const balance = await tx.query.studentCreditBalances.findFirst({
-          where: and(
-            eq(schema.studentCreditBalances.schoolId, schoolId),
-            eq(schema.studentCreditBalances.studentId, student.id),
-          ),
-        });
-
-        return {
-          booking,
-          balanceMinutes: balance?.balanceMinutes ?? 0,
-        };
+      if (existingResult) {
+        return existingResult;
       }
 
       await this.lockBookingOperation(tx, `booking-instructor:${dto.instructorId}`);
@@ -594,6 +650,36 @@ export class BookingsService {
 
       const timezone =
         school.timezone.toLowerCase() === 'sydney' ? 'Australia/Sydney' : school.timezone;
+
+      const creditSource = await tx.query.studentCreditTransactions.findFirst({
+        where: and(
+          eq(schema.studentCreditTransactions.schoolId, schoolId),
+          eq(schema.studentCreditTransactions.studentId, student.id),
+          eq(schema.studentCreditTransactions.type, 'package_credit'),
+          gt(schema.studentCreditTransactions.deltaMinutes, 0),
+          isNotNull(schema.studentCreditTransactions.packagePurchaseId),
+        ),
+        orderBy: [desc(schema.studentCreditTransactions.createdAt)],
+        with: {
+          packagePurchase: {
+            columns: {
+              id: true,
+              packageId: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (!creditSource?.packagePurchase) {
+        throw new BadRequestException('Credit is not associated with a package purchase');
+      }
+
+      const packagePurchase = creditSource.packagePurchase;
+
+      if (packagePurchase.status !== 'paid') {
+        throw new BadRequestException('Credit package purchase is not paid');
+      }
 
       const availableSlots = await this.getCreditAvailableSlots(
         userId,
@@ -625,15 +711,24 @@ export class BookingsService {
           schoolId,
           studentId: student.id,
           instructorId: dto.instructorId,
+
           bookingSource: 'credit',
-          packageId: null,
-          packagePurchaseId: null,
+
+          packageId: packagePurchase.packageId,
+          packagePurchaseId: packagePurchase.id,
+
+          pickupAddress,
           pickupSuburb,
-          pickupPostcode: dto.pickupPostcode ?? null,
+          pickupPostcode,
+          pickupCoordinates,
+          pickupGooglePlaceId,
+
           startDatetime: selectedSlot.startDatetime,
           endDatetime: selectedSlot.endDatetime,
+
           totalPrice: '0.00',
           notes: dto.notes ?? null,
+
           status: 'confirmed',
           confirmedAt: new Date().toISOString(),
           paymentExpiresAt: null,

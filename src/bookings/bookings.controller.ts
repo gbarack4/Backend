@@ -67,6 +67,16 @@ export class BookingsController {
     return this.bookingQueryService.getInstructorBookings(instructorId, dto);
   }
 
+  @Get('instructor/:bookingId')
+  @Roles(Role.Instructor)
+  async getInstructorBookingById(
+    @CurrentInstructorId() instructorId: string,
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' }))
+    bookingId: string,
+  ) {
+    return this.bookingQueryService.getInstructorBookingById(instructorId, bookingId);
+  }
+
   @Get('school/:schoolId/credit-availability')
   @Roles(Role.Student)
   async getCreditAvailability(

@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, asc, desc, eq, gt, ilike, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -290,24 +295,121 @@ export class BookingQueryService {
       .where(and(eq(schema.bookings.instructorId, instructorId), statusCondition, searchCondition))
       .orderBy(orderBy);
 
-    const normalizedBookings = bookings.map((booking) => ({
-      ...normalizeBookingDates(booking),
-      school: {
-        ...booking.school,
-        timezone:
-          booking.school.timezone.toLowerCase() === 'sydney'
-            ? 'Australia/Sydney'
-            : booking.school.timezone,
-      },
-    }));
-
     return {
       counts: counts ?? {
         upcoming: 0,
         completed: 0,
         cancelled: 0,
       },
-      bookings: normalizedBookings,
+      bookings: bookings.map(normalizeBookingDates),
+    };
+  }
+
+  async getInstructorBookingById(instructorId: string, bookingId: string) {
+    const [booking] = await this.db
+      .select({
+        id: schema.bookings.id,
+        schoolId: schema.bookings.schoolId,
+        status: schema.bookings.status,
+        bookingSource: schema.bookings.bookingSource,
+
+        startDatetime: schema.bookings.startDatetime,
+        endDatetime: schema.bookings.endDatetime,
+
+        pickupAddress: schema.bookings.pickupAddress,
+        pickupSuburb: schema.bookings.pickupSuburb,
+        pickupPostcode: schema.bookings.pickupPostcode,
+        pickupCoordinates: schema.bookings.pickupCoordinates,
+
+        totalPrice: schema.bookings.totalPrice,
+
+        transmission: schema.instructors.transmissionType,
+
+        student: {
+          id: schema.students.id,
+          name: schema.students.name,
+          email: schema.students.email,
+          phone: schema.students.phone,
+          avatarUrl: schema.students.avatarUrl,
+        },
+
+        school: {
+          name: schema.schools.name,
+          timezone: schema.schools.timezone,
+        },
+      })
+      .from(schema.bookings)
+      .innerJoin(schema.students, eq(schema.bookings.studentId, schema.students.id))
+      .innerJoin(schema.instructors, eq(schema.bookings.instructorId, schema.instructors.id))
+      .innerJoin(schema.schools, eq(schema.bookings.schoolId, schema.schools.id))
+      .where(and(eq(schema.bookings.id, bookingId), eq(schema.bookings.instructorId, instructorId)))
+      .limit(1);
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (!booking.pickupAddress || !booking.pickupSuburb || !booking.pickupCoordinates) {
+      throw new InternalServerErrorException('Booking pickup location is incomplete');
+    }
+
+    const [completedLessons] = await this.db
+      .select({
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(schema.bookings)
+      .where(
+        and(
+          eq(schema.bookings.schoolId, booking.schoolId),
+          eq(schema.bookings.studentId, booking.student.id),
+          eq(schema.bookings.status, 'completed'),
+        ),
+      );
+
+    const durationMinutes = Math.round(
+      (new Date(booking.endDatetime).getTime() - new Date(booking.startDatetime).getTime()) /
+        60_000,
+    );
+
+    const timezone =
+      booking.school.timezone.toLowerCase() === 'sydney'
+        ? 'Australia/Sydney'
+        : booking.school.timezone;
+
+    return {
+      id: booking.id,
+      status: booking.status,
+      bookingSource: booking.bookingSource,
+
+      startDatetime: booking.startDatetime,
+      endDatetime: booking.endDatetime,
+      durationMinutes,
+
+      transmission: booking.transmission,
+
+      pickup: {
+        address: booking.pickupAddress,
+        suburb: booking.pickupSuburb,
+        postcode: booking.pickupPostcode,
+        latitude: booking.pickupCoordinates.y,
+        longitude: booking.pickupCoordinates.x,
+      },
+
+      totalPrice: booking.totalPrice,
+
+      student: {
+        id: booking.student.id,
+        name: booking.student.name,
+        email: booking.student.email,
+        phone: booking.student.phone,
+        avatarUrl: booking.student.avatarUrl,
+        completedLessonsCount: completedLessons?.count ?? 0,
+      },
+
+      school: {
+        name: booking.school.name,
+        timezone,
+      },
     };
   }
 }
